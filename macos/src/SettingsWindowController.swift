@@ -79,9 +79,9 @@ final class SettingsWindowController: NSWindowController {
                                                    ("Show warning, then text", "show"),
                                                    ("Ignore warning", "ignore")],
                     key: "cw_mode", default: "hide")
-            p.popup("Emoji in posts:", options: emojiOptions,
+            p.popup("Remove emoji from posts:", options: emojiOptions,
                     key: "post_emoji_removal", default: "none")
-            p.popup("Emoji in names:", options: emojiOptions,
+            p.popup("Remove emoji from names:", options: emojiOptions,
                     key: "name_emoji_removal", default: "none")
             p.intRow("Max usernames read per post (0 = all):",
                      key: "max_usernames_in_post", default: 0, min: 0, max: 20)
