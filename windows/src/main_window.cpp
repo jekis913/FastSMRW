@@ -507,6 +507,15 @@ LRESULT MainWindow::WndProc(UINT msg, WPARAM wp, LPARAM lp) {
         SetFocus(timeline_view_);
         return 0;
 
+    case WM_ACTIVATEAPP:
+        if (!wp) {
+            was_deactivated_ = true;
+        } else if (was_deactivated_) {
+            was_deactivated_ = false;
+            dispatch_cmd({{"cmd", "resume"}});
+        }
+        return 0;
+
     case WM_HOTKEY: {
         // A global invisible-interface hotkey fired: run its core action.
         const std::string action = hotkey_driver_.action_for(static_cast<int>(wp));

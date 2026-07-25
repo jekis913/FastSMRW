@@ -365,6 +365,8 @@ void CoreSession::handle(const json& cmd) {
         cmd_refresh();
     else if (c == "refresh_all")
         cmd_refresh_all();
+    else if (c == "resume")
+        cmd_resume();
     else if (c == "load_older")
         cmd_load_older(cmd);
     else if (c == "load_gap")
@@ -844,6 +846,18 @@ void CoreSession::cmd_refresh() {
 void CoreSession::cmd_refresh_all() {
     for (auto& tc : timelines_)
         tc->refresh();
+}
+
+void CoreSession::cmd_resume() {
+    TimelineController* tc = current();
+    if (!tc)
+        return;
+    // A move made before this app was backgrounded is already being pushed to
+    // the server; it must not suppress the first marker pull after another
+    // client may have advanced the shared position. Any movement made after
+    // resuming sets the flag again and still wins over the asynchronous pull.
+    tc->reset_user_moved();
+    tc->refresh();
 }
 
 void CoreSession::cmd_load_gap(const json& cmd) {
@@ -3846,8 +3860,10 @@ std::unique_ptr<TimelineController> CoreSession::make_controller(SocialAccount* 
     // position — unless the user has already moved the cursor themselves this
     // session (matches FastSM/FastSMApple).
     tc->on_refreshed = [this, p] {
-        if (!sync_enabled_for(p))
+        if (!sync_enabled_for(p)) {
+            p->finish_marker_restore();
             return;
+        }
         // One sync cycle per refresh. If the user has actively moved since the
         // last cycle, their position is already being pushed to the server by
         // note_selection — do NOT pull the (now older) server position back and
@@ -3856,8 +3872,11 @@ std::unique_ptr<TimelineController> CoreSession::make_controller(SocialAccount* 
         // client follows an active one. The window resets each cycle.
         const bool moved = p->user_moved_position();
         p->reset_user_moved();
-        if (moved)
+        if (moved) {
+            p->finish_marker_restore();
             return;
+        }
+        p->begin_marker_restore();
         SocialAccount* account = p->account();
         const std::string key = account->account_key();
         // Fetch on the interactive worker so it runs alongside the refresh's page
@@ -3866,17 +3885,56 @@ std::unique_ptr<TimelineController> CoreSession::make_controller(SocialAccount* 
             const std::optional<std::string> marker = account->home_marker();
             loop_.post([this, key, marker] {
                 TimelineController* home = home_controller_for(key);
-                if (!home || !sync_enabled_for(home))
+                if (!home)
                     return;
-                if (home->user_moved_position())
+                if (!sync_enabled_for(home)) {
+                    home->finish_marker_restore();
+                    return;
+                }
+                if (home->user_moved_position()) {
+                    home->finish_marker_restore();
                     return; // the user started reading during the fetch — don't yank them
-                if (!marker || marker->empty())
+                }
+                if (!marker || marker->empty()) {
+                    marker_recovery_attempted_.erase(key);
+                    home->finish_marker_restore();
                     return;
-                if (home->restore_marker_position(*marker))
+                }
+                if (home->restore_marker_position(*marker)) {
+                    marker_recovery_attempted_.erase(key);
+                    home->finish_marker_restore();
                     emit_select_row(home, home->selected_id());
+                    return;
+                }
+                // The marker fell beyond this client's cache/refresh window.
+                // Recover a contiguous slice from the newest post through the
+                // marker, bounded to avoid an unbounded request loop on a deleted
+                // status or a server returning inconsistent pagination.
+                if (marker_recovery_attempted_[key] == *marker) {
+                    home->finish_marker_restore();
+                    return;
+                }
+                marker_recovery_attempted_[key] = *marker;
+                constexpr int kMarkerRecoveryPages = 25;
+                home->load_to_marker(
+                    *marker, kMarkerRecoveryPages,
+                    [this, key, marker = *marker](bool found) {
+                        TimelineController* restored = home_controller_for(key);
+                        if (!restored)
+                            return;
+                        const bool user_moved = restored->user_moved_position();
+                        restored->finish_marker_restore();
+                        if (!found || user_moved || !sync_enabled_for(restored))
+                            return;
+                        marker_recovery_attempted_.erase(key);
+                        if (restored->restore_marker_position(marker))
+                            emit_select_row(restored, restored->selected_id());
+                    });
             });
         });
     };
+    if (sync_enabled_for(p))
+        p->begin_marker_restore();
     return tc;
 }
 

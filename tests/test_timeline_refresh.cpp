@@ -115,6 +115,42 @@ void test_refresh_keeps_updated_conversation() {
     CHECK(scan.hit_known); // and the unchanged conversation stopped the scan
 }
 
+// A server-synced home marker can be older than this device's cache. Recovery
+// must keep paging until that exact status arrives, retain the contiguous history
+// above it, and stop there rather than needlessly walking farther back.
+void test_marker_recovery_pages_until_found() {
+    int fetches = 0;
+    auto fetch = [&](const PageCursor& cursor) {
+        ++fetches;
+        if (cursor.kind == CursorKind::Start)
+            return mkpage({"n6", "n5"}, PageCursor::max_id("n5"));
+        if (cursor.value == "n5")
+            return mkpage({"n4", "n3"}, PageCursor::max_id("n3"));
+        return mkpage({"n2", "marker", "older"}, PageCursor::max_id("older"));
+    };
+    const auto scan = TimelineController::scan_to_marker(
+        "marker", /*max_pages=*/10, /*fetch_limit=*/2, fetch);
+    CHECK(scan.found);
+    CHECK_EQ(fetches, 3);
+    CHECK_EQ(scan.history.size(), size_t(6));
+    if (scan.history.size() == 6)
+        CHECK_EQ(scan.history.back().id(), std::string("s:marker"));
+}
+
+// A missing/deleted marker cannot cause an unbounded network walk. Reaching the
+// safety cap returns the fetched prefix for stitching/manual scrollback.
+void test_marker_recovery_obeys_page_bound() {
+    int fetches = 0;
+    auto fetch = [&](const PageCursor&) {
+        ++fetches;
+        return mkpage({"new", "old"}, PageCursor::max_id(std::to_string(fetches)));
+    };
+    const auto scan = TimelineController::scan_to_marker(
+        "missing", /*max_pages=*/4, /*fetch_limit=*/2, fetch);
+    CHECK(!scan.found);
+    CHECK_EQ(fetches, 4);
+}
+
 // Losing the row you're reading must not lose your place in the timeline. A post
 // can vanish under the cursor at any time — the author deletes it, or a filter
 // starts hiding it — and every front end finds the reading position by id, so a
@@ -183,4 +219,23 @@ void test_position_hint_falls_back_to_nearest() {
     tc.set_position_hint("s:mid", 400);
     tc.set_filter(nullptr);
     CHECK_EQ(tc.selected_id(), std::string("s:mid"));
+}
+
+// List controls can focus the first row automatically while a startup marker
+// restore is pending. Only that default-edge echo is passive; navigating even
+// one row away must still count as a real move and cancel the restore.
+void test_marker_restore_ignores_only_provisional_edge_focus() {
+    TimelineSource src;
+    src.kind = TimelineSource::Kind::PostUsers; // static: no I/O
+    TimelineController tc(nullptr, src, nullptr, nullptr, nullptr, 40);
+    for (const char* id : {"third", "second", "first"})
+        tc.ingest_realtime(mkitem(id));
+
+    int moves = 0;
+    tc.on_user_moved = [&] { ++moves; };
+    tc.begin_marker_restore();
+    tc.note_selection(tc.items().front().id());
+    CHECK_EQ(moves, 0);
+    tc.note_selection(tc.items()[1].id());
+    CHECK_EQ(moves, 1);
 }

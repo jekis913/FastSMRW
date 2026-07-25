@@ -626,6 +626,8 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshAll() = core.dispatch("refresh_all")
 
+    fun resume() = core.dispatch("resume")
+
     /** Open a post's conversation as a new tab. */
     fun openThread(id: String) = core.dispatch("open_thread") { put("id", id) }
 

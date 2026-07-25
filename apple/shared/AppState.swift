@@ -261,6 +261,10 @@ final class AppState {
         client.send("perform_action", ["action": action, "id": id])
     }
     func refresh() { client.send("refresh") }
+    /// The app became active after being backgrounded. Unlike a manual refresh,
+    /// this starts a fresh Home-marker sync window so another client's position
+    /// can be adopted.
+    func resume() { client.send("resume") }
 
     // Settings: mutate the full object and echo it back so the core keeps every
     // field (it re-applies defaults for anything missing).
