@@ -79,6 +79,23 @@ public:
                                     int max_pages, int fetch_limit,
                                     const std::function<TimelinePage(const PageCursor&)>& fetch);
 
+    // Missing-marker recovery (pure scan + asynchronous controller wrapper).
+    // Home-position sync normally restores directly from the cache/refreshed
+    // rows. If the server marker is older than that window, walk newest-first
+    // until the marked status arrives, then merge that contiguous history
+    // without treating old rows as newly received.
+    struct MarkerScan {
+        std::vector<TimelineItem> history;
+        std::vector<std::pair<std::string, PageCursor>> marks;
+        std::optional<PageCursor> tail;
+        bool found = false;
+    };
+    static MarkerScan scan_to_marker(
+        const std::string& status_id, int max_pages, int fetch_limit,
+        const std::function<TimelinePage(const PageCursor&)>& fetch);
+    void load_to_marker(const std::string& status_id, int max_pages,
+                        std::function<void(bool found)> done);
+
     // Global "reverse timelines" preference: when on, the visible list is flipped
     // (oldest at top, newest at bottom) for time-ordered feeds only. raw_ stays
     // canonical newest-first, so merge/gap/pagination are unaffected — only the
@@ -187,9 +204,16 @@ public:
     bool user_moved_position() const { return user_moved_position_; }
     void reset_user_moved() { user_moved_position_ = false; }
     std::optional<std::string> selected_status_id() const;
-    // Move the reading position to the row carrying `status_id`; returns true if
-    // such a row exists and the position actually changed.
+    // Move the reading position to the row carrying `status_id`. If that status
+    // was fetched but hidden by a filter, use its nearest visible neighbor.
+    // Returns true if the position actually changed.
     bool restore_marker_position(const std::string& status_id);
+    // During the initial server-marker lookup, front ends may focus the default
+    // edge row simply because the list appeared (not because the user navigated).
+    // Treat only that one provisional selection as passive; any move away from
+    // the edge still cancels the restore and wins over the server position.
+    void begin_marker_restore() { marker_restore_pending_ = true; }
+    void finish_marker_restore() { marker_restore_pending_ = false; }
 
     // Cache key of the timeline that was current when this one was spawned, so
     // closing it returns there instead of a neighbor (Mac parity). Empty for the
@@ -230,6 +254,7 @@ private:
     bool muted_ = false;                // user muted this tab's new-item earcon
     bool auto_read_ = false;            // user enabled auto-read for this tab
     bool user_moved_position_ = false;  // user moved the home position since the last sync cycle
+    bool marker_restore_pending_ = false; // server marker lookup/backfill is in progress
     std::optional<PageCursor> scrollback_cursor_;
     std::vector<store::CacheGap> gaps_; // tracked middle gaps (after_id -> cursor)
     // Page-boundary cursors (row id -> cursor to fetch the page just below it),

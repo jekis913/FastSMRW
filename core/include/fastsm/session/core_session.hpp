@@ -379,6 +379,9 @@ private:
     std::string marker_pending_key_;                          // account_key of the pending save
     std::string marker_pending_id_;                           // status id to push
     std::unordered_map<std::string, std::string> marker_last_saved_; // key -> last id sent
+    // A marker that a bounded history walk could not find. Do not repeat the
+    // same expensive walk every auto-refresh; a changed server marker may retry.
+    std::unordered_map<std::string, std::string> marker_recovery_attempted_;
     int marker_gen_ = 0;                                      // cancels superseded saves
     // Include each post's links ({title,url}) in its row JSON, so a mobile app
     // can offer one action per link. On only when the "expand_links" post

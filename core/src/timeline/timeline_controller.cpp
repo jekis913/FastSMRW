@@ -41,6 +41,16 @@ void TimelineController::note_selection(const std::string& id) {
         }
     }
     selected_id_ = id;
+    // iOS/VoiceOver (and some desktop list controls) focus the default edge row
+    // as soon as a newly-populated list appears. While the first server-marker
+    // restore is pending, that focus echo is provisional rather than evidence
+    // that the user deliberately moved. A move to any other row still fires the
+    // callback and therefore cancels the restore as before.
+    const int selected = visible_index_of(selected_id_);
+    const int default_edge =
+        reversed() && !visible_.empty() ? static_cast<int>(visible_.size()) - 1 : 0;
+    if (marker_restore_pending_ && selected == default_edge)
+        return;
     if (on_user_moved)
         on_user_moved();
 }
@@ -480,6 +490,107 @@ TimelineController::RefreshScan TimelineController::scan_refresh(
     return out;
 }
 
+TimelineController::MarkerScan TimelineController::scan_to_marker(
+    const std::string& status_id, int max_pages, int fetch_limit,
+    const std::function<TimelinePage(const PageCursor&)>& fetch) {
+    MarkerScan out;
+    if (status_id.empty() || max_pages < 1)
+        return out;
+
+    PageCursor cursor = PageCursor::start();
+    for (int page_number = 0; page_number < max_pages; ++page_number) {
+        TimelinePage page = fetch(cursor);
+        const size_t page_size = page.items.size();
+        out.tail = page.next_cursor;
+        if (page_size == 0)
+            break;
+
+        std::string last_consumed;
+        for (auto& item : page.items) {
+            last_consumed = item.id();
+            const Status* status = item.status();
+            const bool is_marker = status && status->id == status_id;
+            out.history.push_back(std::move(item));
+            if (is_marker) {
+                out.found = true;
+                break;
+            }
+        }
+        if (out.found)
+            break;
+
+        if (page.next_cursor && !last_consumed.empty())
+            out.marks.push_back({last_consumed, *page.next_cursor});
+        if (!page.next_cursor || static_cast<int>(page_size) < fetch_limit)
+            break;
+        cursor = *page.next_cursor;
+    }
+    return out;
+}
+
+void TimelineController::load_to_marker(const std::string& status_id, int max_pages,
+                                        std::function<void(bool found)> done) {
+    if (status_id.empty() || loading_ || !account_ || !worker_ || !main_) {
+        if (done)
+            done(false);
+        return;
+    }
+    loading_ = true;
+    worker_->post([this, status_id, max_pages, done = std::move(done)]() mutable {
+        MarkerScan scan = scan_to_marker(
+            status_id, max_pages, fetch_limit_,
+            [this](const PageCursor& cursor) {
+                return account_->items(source_, fetch_limit_, cursor);
+            });
+        main_->post([this, status_id, scan = std::move(scan), done = std::move(done)]() mutable {
+            std::unordered_set<std::string> existing;
+            existing.reserve(raw_.size() + scan.history.size());
+            for (const auto& item : raw_)
+                existing.insert(item.id());
+            for (auto& item : scan.history)
+                if (existing.insert(item.id()).second)
+                    raw_.push_back(std::move(item));
+            for (auto& mark : scan.marks)
+                page_marks_[mark.first] = mark.second;
+
+            if (source_.is_time_ordered())
+                std::stable_sort(raw_.begin(), raw_.end(),
+                                 [](const TimelineItem& a, const TimelineItem& b) {
+                                     if (a.is_pinned() != b.is_pinned())
+                                         return a.is_pinned();
+                                     return a.sort_date() > b.sort_date();
+                                 });
+
+            // A successful Mastodon marker scan is contiguous from the newest row
+            // through the marked status. Resume ordinary scrollback immediately
+            // below that status; any prior middle-gap records are now redundant.
+            if (scan.found && source_.paginates_by_item_id()) {
+                scrollback_cursor_ = PageCursor::max_id(status_id);
+                auto marker = std::find_if(raw_.begin(), raw_.end(),
+                                           [&](const TimelineItem& item) {
+                                               const Status* status = item.status();
+                                               return status && status->id == status_id;
+                                           });
+                if (marker != raw_.end())
+                    page_marks_[marker->id()] = *scrollback_cursor_;
+                gaps_.clear();
+            } else if (scan.tail) {
+                // If the safety bound was reached, keep the newly-discovered tail
+                // available to the normal Load Older path.
+                scrollback_cursor_ = scan.tail;
+            }
+
+            rebuild_visible();
+            persist();
+            loading_ = false;
+            if (on_change)
+                on_change();
+            if (done)
+                done(scan.found);
+        });
+    });
+}
+
 void TimelineController::refresh() {
     if (source_.is_static()) // seeded rows never refresh from the network
         return;
@@ -547,6 +658,32 @@ bool TimelineController::restore_marker_position(const std::string& status_id) {
             if (selected_id_ == it.id())
                 return false; // already there
             selected_id_ = it.id();
+            return true;
+        }
+    }
+
+    // The marker can be present in raw_ but absent from visible_ because a
+    // server/client filter hides it. Anchor to the closest visible status in
+    // canonical timeline order instead of abandoning the restore at the top.
+    auto marker = std::find_if(raw_.begin(), raw_.end(), [&](const TimelineItem& item) {
+        const Status* status = item.status();
+        return status && status->id == status_id;
+    });
+    if (marker == raw_.end())
+        return false;
+    const size_t marker_index = static_cast<size_t>(marker - raw_.begin());
+    for (size_t distance = 1; distance < raw_.size(); ++distance) {
+        const size_t newer = marker_index >= distance ? marker_index - distance : raw_.size();
+        const size_t older = marker_index + distance;
+        for (const size_t candidate : {newer, older}) {
+            if (candidate >= raw_.size())
+                continue;
+            const std::string& id = raw_[candidate].id();
+            if (visible_index_of(id) < 0)
+                continue;
+            if (selected_id_ == id)
+                return false;
+            selected_id_ = id;
             return true;
         }
     }

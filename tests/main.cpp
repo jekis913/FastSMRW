@@ -114,8 +114,11 @@ void test_refresh_fills_gap_below_streamed_top();
 void test_refresh_steady_state_stops_early();
 void test_refresh_fills_multipage_gap();
 void test_refresh_keeps_updated_conversation();
+void test_marker_recovery_pages_until_found();
+void test_marker_recovery_obeys_page_bound();
 void test_lost_row_keeps_reading_position();
 void test_position_hint_falls_back_to_nearest();
+void test_marker_restore_ignores_only_provisional_edge_focus();
 
 static void test_version() {
     CHECK(fastsm::version() != nullptr);
@@ -213,8 +216,11 @@ int main() {
     test_refresh_steady_state_stops_early();
     test_refresh_fills_multipage_gap();
     test_refresh_keeps_updated_conversation();
+    test_marker_recovery_pages_until_found();
+    test_marker_recovery_obeys_page_bound();
     test_lost_row_keeps_reading_position();
     test_position_hint_falls_back_to_nearest();
+    test_marker_restore_ignores_only_provisional_edge_focus();
 
     std::printf("%d checks, %d failures\n", fastsmtest::checks(), fastsmtest::failures());
     return fastsmtest::failures() == 0 ? 0 : 1;
