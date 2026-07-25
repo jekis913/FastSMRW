@@ -6,6 +6,7 @@ FastSMRW changelog
 
 - New: open the built-in user guide from inside the app — press F1 on Windows and Mac, or choose Help in the More menu on iPhone and Android.
 - Fixed: home position sync now saves your spot no matter how you move through the timeline (including the invisible interface), and no longer tugs you around while you're actively reading.
+- Fixed: the Mac and iPhone settings now make it clear that "Off" disables emoji removal rather than hiding emoji.
 
 0.5.2
 -----
