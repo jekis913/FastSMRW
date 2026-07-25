@@ -67,7 +67,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         if wasBackgrounded {
             wasBackgrounded = false
-            state?.refresh()
+            state?.resume()
         }
     }
 

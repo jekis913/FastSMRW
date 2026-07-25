@@ -44,6 +44,7 @@ import me.masonasons.fastsm.util.CustomTabs
 class MainActivity : ComponentActivity() {
 
     private val vm: CoreViewModel by viewModels()
+    private var hasResumed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +56,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Startup already loads and syncs the timelines. Later resumes begin a
+        // new marker-sync window so a position moved on another client is pulled.
+        if (hasResumed) vm.resume() else hasResumed = true
     }
 
     // singleTop: the fastsm://oauth redirect re-enters the live activity here.

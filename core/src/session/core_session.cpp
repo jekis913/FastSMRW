@@ -365,6 +365,8 @@ void CoreSession::handle(const json& cmd) {
         cmd_refresh();
     else if (c == "refresh_all")
         cmd_refresh_all();
+    else if (c == "resume")
+        cmd_resume();
     else if (c == "load_older")
         cmd_load_older(cmd);
     else if (c == "load_gap")
@@ -844,6 +846,18 @@ void CoreSession::cmd_refresh() {
 void CoreSession::cmd_refresh_all() {
     for (auto& tc : timelines_)
         tc->refresh();
+}
+
+void CoreSession::cmd_resume() {
+    TimelineController* tc = current();
+    if (!tc)
+        return;
+    // A move made before this app was backgrounded is already being pushed to
+    // the server; it must not suppress the first marker pull after another
+    // client may have advanced the shared position. Any movement made after
+    // resuming sets the flag again and still wins over the asynchronous pull.
+    tc->reset_user_moved();
+    tc->refresh();
 }
 
 void CoreSession::cmd_load_gap(const json& cmd) {

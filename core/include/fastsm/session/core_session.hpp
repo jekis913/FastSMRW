@@ -65,6 +65,7 @@ private:
     void cmd_select_account(const nlohmann::json& cmd);
     void cmd_refresh();
     void cmd_refresh_all();
+    void cmd_resume(); // app returned from background: refresh + pull remote Home marker
     void cmd_load_older(const nlohmann::json& cmd);
     void cmd_load_gap(const nlohmann::json& cmd);
     void cmd_note_selection(const nlohmann::json& cmd);

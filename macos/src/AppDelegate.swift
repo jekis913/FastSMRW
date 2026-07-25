@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = AppState()
     private var mainWindowController: MainWindowController?
     private var settingsWindowController: SettingsWindowController?
+    private var hasBeenActive = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.build()
@@ -36,6 +37,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindowController = controller
 
         state.start()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // The initial activation is already covered by start(). On subsequent
+        // activations (for example Command-Tabbing back), refresh and begin a
+        // fresh server-marker pull so this client follows the active device.
+        guard hasBeenActive else {
+            hasBeenActive = true
+            return
+        }
+        state?.resume()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

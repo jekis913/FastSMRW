@@ -237,6 +237,7 @@ private:
     std::map<std::string, std::string> layer_bindings_;     // cached bare-key layer map
     std::string layer_activation_ = "control+win+space";    // cached layer toggle combo
     bool overlay_layer_ = false; // the layer was called up on demand (EnterLayer)
+    bool was_deactivated_ = false; // another app was active; resume sync on return
     // Idempotency guards: apply_invisible() re-fetches keymaps only when one of these
     // changed (otherwise every unrelated settings broadcast would thrash the driver),
     // and install_active_driver() skips a redundant (re)install of the same signature.
