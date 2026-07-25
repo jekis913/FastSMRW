@@ -17,6 +17,17 @@ Front ends today:
 - **iOS** — Swift + UIKit.
   **[Join the public beta on TestFlight](https://testflight.apple.com/join/1Aw6DRGy)**
 
+## User guides
+
+New to FastSMRW? Each guide covers getting started, moving around, opening
+timelines, and every command on that platform:
+
+- **[Windows](README-Windows.md)** — keyboard-driven, with an optional invisible
+  interface for driving FastSM from other apps.
+- **[Mac](README-macOS.md)** — menu-bar and keyboard driven.
+- **[iPhone (iOS)](README-iOS.md)** — touch and VoiceOver.
+- **[Android](README-Android.md)** — touch and TalkBack.
+
 ## Design goals
 
 - **Accessibility first** — screen-reader output, full keyboard control, and

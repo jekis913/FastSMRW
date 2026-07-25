@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -148,6 +149,7 @@ fun HomeScreen(
                             Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                         }
                         var menuOpen by remember { mutableStateOf(false) }
+                        val uriHandler = LocalUriHandler.current
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, contentDescription = "More")
                         }
@@ -187,6 +189,15 @@ fun HomeScreen(
                             DropdownMenuItem(
                                 text = { Text("Settings") },
                                 onClick = { menuOpen = false; onOpenSettings() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Help (user guide)") },
+                                onClick = {
+                                    menuOpen = false
+                                    // Open the Android user guide on GitHub.
+                                    uriHandler.openUri(
+                                        "https://github.com/masonasons/FastSMRW/blob/main/README-Android.md")
+                                },
                             )
                         }
                     },

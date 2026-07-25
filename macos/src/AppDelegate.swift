@@ -56,6 +56,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func checkForUpdates(_ sender: Any?) { state?.checkForUpdate(silent: false) }
 
+    // Open the Mac user guide on GitHub in the default browser.
+    @objc func showHelp(_ sender: Any?) {
+        if let url = URL(string:
+            "https://github.com/masonasons/FastSMRW/blob/main/README-macOS.md") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     // MARK: Updates
 
     private func handleUpdate(_ status: UpdateStatus) {

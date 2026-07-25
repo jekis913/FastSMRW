@@ -23,6 +23,10 @@ enum MainMenu {
                         keyEquivalent: "")
         appMenu.addItem(withTitle: "Check for Updates…",
                         action: #selector(AppDelegate.checkForUpdates(_:)), keyEquivalent: "")
+        let help = appMenu.addItem(withTitle: "Help (User Guide)",
+                                   action: #selector(AppDelegate.showHelp(_:)),
+                                   keyEquivalent: String(UnicodeScalar(NSF1FunctionKey)!))
+        help.keyEquivalentModifierMask = [] // F1, no modifiers
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(AppDelegate.showSettings(_:)),
                         keyEquivalent: ",")

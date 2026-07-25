@@ -106,6 +106,7 @@ enum {
     ID_MY_FOLLOWERS,
     ID_MY_FOLLOWING,
     ID_STOP_MEDIA,
+    ID_HELP,
     ID_GOTO_TIMELINE_1 = 40100, // .. +8 for timelines 1-9
 };
 
@@ -209,6 +210,7 @@ HMENU build_menu() {
 
     HMENU app = CreatePopupMenu();
     AppendMenuW(app, MF_STRING, ID_ABOUT, L"&About FastSMRW");
+    AppendMenuW(app, MF_STRING, ID_HELP, L"&Help (User Guide)\tF1");
     AppendMenuW(app, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(app, MF_STRING, ID_SETTINGS, L"&Settings…\tCtrl+Comma");
     AppendMenuW(app, MF_STRING, ID_KEYMAP_MANAGER, L"&Keyboard Manager…");
@@ -353,6 +355,7 @@ bool MainWindow::create() {
         {FVIRTKEY | FCONTROL | FSHIFT, 'F', ID_CLIENT_FILTER}, // Ctrl+Shift+F: client filters
         {FVIRTKEY, VK_F3, ID_FIND_NEXT},             // F3: find next
         {FVIRTKEY | FSHIFT, VK_F3, ID_FIND_PREV},    // Shift+F3: find previous
+        {FVIRTKEY, VK_F1, ID_HELP},                   // F1: open the user guide
         {FVIRTKEY | FSHIFT, VK_F1, ID_CHECK_UPDATES}, // Shift+F1: check for updates
         {FVIRTKEY | FCONTROL, 'U', ID_USER_PROFILE}, // Ctrl+U: open user profile
         {FVIRTKEY | FCONTROL, VK_OEM_1, ID_SPEAK_USER},          // Ctrl+;: speak the post's user(s)
@@ -1985,6 +1988,12 @@ void MainWindow::handle_command(int id) {
     case ID_CHECK_UPDATES:
         announce("Checking for updates…");
         dispatch_cmd({{"cmd", "check_for_update"}, {"silent", false}});
+        break;
+    case ID_HELP:
+        // Open the Windows user guide on GitHub in the default browser.
+        ShellExecuteW(nullptr, L"open",
+                      L"https://github.com/masonasons/FastSMRW/blob/main/README-Windows.md",
+                      nullptr, nullptr, SW_SHOW);
         break;
     case ID_FIND:
         do_find();

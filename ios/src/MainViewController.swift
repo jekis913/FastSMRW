@@ -839,6 +839,14 @@ final class MainViewController: UIViewController {
                     self.push(UserAnalysisViewController(state: self.state))
                 },
             ]))
+            // Open the iPhone user guide on GitHub in the browser.
+            items.append(UIAction(title: "Help (User Guide)",
+                                  image: UIImage(systemName: "questionmark.circle")) { _ in
+                if let url = URL(string:
+                    "https://github.com/masonasons/FastSMRW/blob/main/README-iOS.md") {
+                    UIApplication.shared.open(url)
+                }
+            })
             completion(items)
         }])
     }
