@@ -6,7 +6,12 @@
 
 namespace fastsm::runtime {
 
-WorkerQueue::WorkerQueue() : thread_([this] { run(); }) {}
+WorkerQueue::WorkerQueue() {
+    // Start the thread from the body, not the member-init list: thread_ is
+    // declared before the mutex/queues, so an init-list start would let run()
+    // lock members that haven't been constructed yet (a real, if rare, crash).
+    thread_ = std::thread([this] { run(); });
+}
 
 WorkerQueue::~WorkerQueue() {
     {

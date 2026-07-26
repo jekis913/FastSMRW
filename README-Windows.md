@@ -3,7 +3,7 @@
 [← All FastSMRW guides](README.md)
 
 This is the guide for the Windows version of FastSMRW. There are also guides for
-[Mac](README-macOS.md), [iPhone](README-iOS.md), and [Android](README-Android.md).
+[Mac](README-macOS.md), [iPhone](README-iOS.md), [Android](README-Android.md), and [Linux](README-Linux.md).
 
 FastSMRW is a fast, accessible Mastodon and Bluesky client for blind and
 low-vision users. On Windows it is keyboard-only, works cleanly with screen

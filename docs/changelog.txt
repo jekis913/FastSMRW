@@ -4,6 +4,8 @@ FastSMRW changelog
 0.5.3
 -----
 
+- New: a first, early Linux app — add your accounts, read and switch timelines, write, reply to, quote and edit posts, attach media with descriptions, boost, favorite and bookmark, open post info, threads and user profiles, follow/mute/block, manage your lists, followed hashtags, user aliases and server filters, filter timelines client-side, report posts and users, edit your profile, analyze your follow relationships, vote in polls, find in a timeline, change your settings, use the invisible interface's system-wide hotkeys, and hear announcements and earcons through Orca or Speech Dispatcher.
+- Fixed: a rare random crash at the moment the app starts.
 - New: open the built-in user guide from inside the app — press F1 on Windows and Mac, or choose Help in the More menu on iPhone and Android.
 - Fixed: home position sync now saves your spot no matter how you move through the timeline (including the invisible interface), and no longer tugs you around while you're actively reading.
 - Fixed: home position sync now catches up when you return to a backgrounded app, and can find your last-read post even when it is older than this device's saved timeline.

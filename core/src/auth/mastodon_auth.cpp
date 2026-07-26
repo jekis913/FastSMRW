@@ -4,15 +4,27 @@
 // app + build the authorize URL for a given redirect URI) and finish_login
 // (exchange the code + verify) — so any front end can drive its own redirect
 // handling. The desktop login() below wraps them around a 127.0.0.1 loopback
-// listener that catches the browser redirect; that listener is Windows-only.
-// Android drives a Custom Tab + fastsm://oauth deep link and calls the two
-// helpers directly.
+// listener that catches the browser redirect; that listener exists on desktop
+// platforms (Windows + Linux). Android drives a Custom Tab + fastsm://oauth
+// deep link and calls the two helpers directly; Apple front ends do the same
+// with the fastsm:// URL scheme.
+
+// Desktop platforms where the in-core loopback redirect listener is built.
+#if defined(_WIN32) || (defined(__linux__) && !defined(__ANDROID__))
+#define FASTSM_HAVE_LOOPBACK_LISTENER 1
+#endif
+
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#elif defined(FASTSM_HAVE_LOOPBACK_LISTENER)
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 #include <nlohmann/json.hpp>
@@ -49,8 +61,18 @@ std::string random_state() {
 
 } // namespace
 
-#ifdef _WIN32
+#ifdef FASTSM_HAVE_LOOPBACK_LISTENER
 namespace {
+
+#ifdef _WIN32
+using SocketHandle = SOCKET;
+constexpr SocketHandle kInvalidSock = INVALID_SOCKET;
+void close_socket(SocketHandle s) { closesocket(s); }
+#else
+using SocketHandle = int;
+constexpr SocketHandle kInvalidSock = -1;
+void close_socket(SocketHandle s) { ::close(s); }
+#endif
 
 // A one-shot loopback HTTP listener: binds 127.0.0.1 on an OS-chosen port,
 // hands back the port, then blocks until the browser hits the redirect and
@@ -58,11 +80,13 @@ namespace {
 class LoopbackListener {
 public:
     bool start() {
+#ifdef _WIN32
         if (WSAStartup(MAKEWORD(2, 2), &wsa_) != 0)
             return false;
         started_ = true;
+#endif
         sock_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (sock_ == INVALID_SOCKET)
+        if (sock_ == kInvalidSock)
             return false;
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
@@ -70,7 +94,11 @@ public:
         inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
         if (bind(sock_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
             return false;
+#ifdef _WIN32
         int len = sizeof(addr);
+#else
+        socklen_t len = sizeof(addr);
+#endif
         if (getsockname(sock_, reinterpret_cast<sockaddr*>(&addr), &len) != 0)
             return false;
         port_ = ntohs(addr.sin_port);
@@ -84,12 +112,12 @@ public:
 
     // Blocks for the redirect; returns the authorization code (or empty).
     std::string wait_for_code() {
-        SOCKET client = accept(sock_, nullptr, nullptr);
-        if (client == INVALID_SOCKET)
+        SocketHandle client = accept(sock_, nullptr, nullptr);
+        if (client == kInvalidSock)
             return {};
         std::string request;
         char buf[2048];
-        int n = recv(client, buf, sizeof(buf) - 1, 0);
+        int n = static_cast<int>(recv(client, buf, sizeof(buf) - 1, 0));
         if (n > 0)
             request.assign(buf, static_cast<size_t>(n));
 
@@ -102,16 +130,18 @@ public:
                                std::to_string(std::char_traits<char>::length(body)) + "\r\n\r\n" +
                                body;
         send(client, response.c_str(), static_cast<int>(response.size()), 0);
-        closesocket(client);
+        close_socket(client);
 
         return extract_code(request);
     }
 
     ~LoopbackListener() {
-        if (sock_ != INVALID_SOCKET)
-            closesocket(sock_);
+        if (sock_ != kInvalidSock)
+            close_socket(sock_);
+#ifdef _WIN32
         if (started_)
             WSACleanup();
+#endif
     }
 
 private:
@@ -128,14 +158,16 @@ private:
         return request.substr(start, end - start);
     }
 
+#ifdef _WIN32
     WSADATA wsa_{};
     bool started_ = false;
-    SOCKET sock_ = INVALID_SOCKET;
+#endif
+    SocketHandle sock_ = kInvalidSock;
     int port_ = 0;
 };
 
 } // namespace
-#endif // _WIN32 (loopback listener)
+#endif // FASTSM_HAVE_LOOPBACK_LISTENER
 
 MastodonAuth::MastodonAuth(net::IHttpClient* http) : http_(http) {}
 
@@ -275,7 +307,7 @@ MastodonLoginResult MastodonAuth::finish_login(const MastodonCredentials& creds,
     return result;
 }
 
-#ifdef _WIN32
+#ifdef FASTSM_HAVE_LOOPBACK_LISTENER
 // Desktop interactive login: begin_login against a loopback redirect, open the
 // browser, wait for the redirect, then finish_login. Blocking — worker thread.
 MastodonLoginResult
@@ -308,7 +340,7 @@ MastodonAuth::login(const std::string& instance_input,
 
     return finish_login(begun.credentials, code, redirect);
 }
-#else  // non-Windows: no loopback listener. Front ends drive begin_login/
+#else  // mobile: no loopback listener. Front ends drive begin_login/
        // finish_login around their own redirect handling.
 MastodonLoginResult MastodonAuth::login(const std::string& instance_input,
                                         const std::function<void(const std::string&)>&) {
@@ -317,6 +349,6 @@ MastodonLoginResult MastodonAuth::login(const std::string& instance_input,
     result.error = "Use begin_login/finish_login on this platform";
     return result;
 }
-#endif // _WIN32
+#endif // FASTSM_HAVE_LOOPBACK_LISTENER
 
 } // namespace fastsm

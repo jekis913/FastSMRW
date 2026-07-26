@@ -90,7 +90,7 @@ std::filesystem::path config_dir() {
 std::filesystem::path cache_dir() {
     // Kept inside the single FastSM data folder (alongside config), not a
     // separate %LOCALAPPDATA% location.
-    return ensure(config_dir() / L"cache");
+    return ensure(config_dir() / "cache");
 }
 
 } // namespace fastsm::store
