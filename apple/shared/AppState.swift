@@ -425,6 +425,11 @@ final class AppState {
     func followToggle(accountId: String, acct: String) {
         client.send("follow_toggle", ["account_id": accountId, "acct": acct])
     }
+    /// Follow/unfollow the author of a post (the core resolves who, showing a user
+    /// picker when a post references several people).
+    func followToggleInPost(id: String) {
+        client.send("follow_toggle", ["id": id, "pick": true])
+    }
     func setRelationship(accountId: String, action: String, acct: String) {
         client.send("set_relationship", ["account_id": accountId, "action": action, "acct": acct])
     }

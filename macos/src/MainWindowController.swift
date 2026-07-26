@@ -275,6 +275,11 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate {
     @objc func editProfile(_ sender: Any?) { state.openProfileEditor() }
     @objc func viewMyFollowers(_ sender: Any?) { state.spawnTimeline(kind: "my_followers") }
     @objc func viewMyFollowing(_ sender: Any?) { state.spawnTimeline(kind: "my_following") }
+    @objc func viewMutedUsers(_ sender: Any?) { state.spawnTimeline(kind: "mutes") }
+    @objc func viewBlockedUsers(_ sender: Any?) { state.spawnTimeline(kind: "blocks") }
+    @objc func viewFollowRequests(_ sender: Any?) { state.spawnTimeline(kind: "follow_requests") }
+    @objc func followAuthorSelection(_ sender: Any?) { postsViewController.followAuthorSelection(sender) }
+    @objc func loadOlderPosts(_ sender: Any?) { postsViewController.loadOlderPosts(sender) }
     @objc func accountSettings(_ sender: Any?) { state.getAccountSettings() }
 
     /// Per-account settings (the soundpack this account's timelines play),
@@ -348,6 +353,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate {
     @objc func refreshAll(_ sender: Any?) { state.refreshAll() }
     @objc func goBack(_ sender: Any?) { state.goBack() }
     @objc func filterTimeline(_ sender: Any?) { state.getClientFilter() }
+    @objc func findInTimeline(_ sender: Any?) { postsViewController.findInTimeline() }
+    @objc func findNext(_ sender: Any?) { postsViewController.findNext() }
+    @objc func findPrevious(_ sender: Any?) { postsViewController.findPrevious() }
     @objc func removeCurrentAccount(_ sender: Any?) {
         guard let window, !state.selectedAccountKey.isEmpty else { return }
         let handle = state.currentAccountHandle ?? "this account"

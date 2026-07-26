@@ -498,6 +498,61 @@ final class MainViewController: UIViewController {
         focusRow(target)
     }
 
+    // MARK: Find in timeline (client-side, mirroring the desktop apps)
+
+    private var findQuery = ""
+
+    func findInTimeline() {
+        promptForFindQuery(seed: findQuery) { [weak self] query in
+            guard let self, let query, !query.isEmpty else { return }
+            self.findQuery = query
+            self.findFrom(start: max(self.keyboardRow, 0), direction: 1)
+        }
+    }
+
+    func findNext() {
+        if findQuery.isEmpty { findInTimeline(); return }
+        findFrom(start: keyboardRow + 1, direction: 1)
+    }
+
+    func findPrevious() {
+        if findQuery.isEmpty { findInTimeline(); return }
+        findFrom(start: keyboardRow - 1, direction: -1)
+    }
+
+    /// Case-insensitive substring search over the posts' spoken text, scanning in
+    /// `direction` from `start` and wrapping around once. A match moves the reading
+    /// cursor there (VoiceOver reads it, the position is noted to the core).
+    private func findFrom(start: Int, direction: Int) {
+        let count = rows.count
+        guard count > 0, !findQuery.isEmpty else { return }
+        let needle = findQuery.lowercased()
+        for offset in 0 ..< count {
+            let i = ((start + direction * offset) % count + count) % count
+            if rows[i].text.lowercased().contains(needle) {
+                focusRow(i)
+                return
+            }
+        }
+        UIAccessibility.post(notification: .announcement, argument: "Not found")
+    }
+
+    private func promptForFindQuery(seed: String, completion: @escaping (String?) -> Void) {
+        let alert = UIAlertController(title: "Find in Timeline",
+                                      message: "Find posts containing:", preferredStyle: .alert)
+        alert.addTextField { field in
+            field.text = seed
+            field.autocapitalizationType = .none
+            field.accessibilityLabel = "Find in timeline"
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completion(nil) })
+        alert.addAction(UIAlertAction(title: "Find", style: .default) { [weak alert] _ in
+            completion(alert?.textFields?.first?.text?
+                .trimmingCharacters(in: .whitespacesAndNewlines))
+        })
+        present(alert, animated: true)
+    }
+
     /// Same bindings as the desktop apps, adapted to iPad conventions.
     private func buildHardwareKeys() {
         addKey(UIKeyCommand.inputUpArrow, [], "Previous Post", priority: true) { [weak self] in
@@ -514,6 +569,9 @@ final class MainViewController: UIViewController {
             [weak self] in
             self?.state.selectTimeline(dir: "next")
         }
+        addKey("f", .command, "Find in Timeline") { [weak self] in self?.findInTimeline() }
+        addKey("g", .command, "Find Next") { [weak self] in self?.findNext() }
+        addKey("g", [.command, .shift], "Find Previous") { [weak self] in self?.findPrevious() }
         addKey(UIKeyCommand.inputUpArrow, .alternate, "Jump Back by Movement Unit") {
             [weak self] in
             self?.state.moveByUnit(dir: "prev")
@@ -744,6 +802,18 @@ final class MainViewController: UIViewController {
                 },
             ]
             var timelineItems: [UIMenuElement] = [
+                UIAction(title: "Find in Timeline…",
+                         image: UIImage(systemName: "magnifyingglass")) { [weak self] _ in
+                    self?.findInTimeline()
+                },
+                UIAction(title: "Find Next",
+                         image: UIImage(systemName: "chevron.down")) { [weak self] _ in
+                    self?.findNext()
+                },
+                UIAction(title: "Find Previous",
+                         image: UIImage(systemName: "chevron.up")) { [weak self] _ in
+                    self?.findPrevious()
+                },
                 UIAction(title: "Filter Timeline…",
                          image: UIImage(systemName: "line.3.horizontal.decrease.circle")) {
                     [weak self] _ in

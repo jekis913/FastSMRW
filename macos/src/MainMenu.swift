@@ -99,9 +99,10 @@ enum MainMenu {
         add("Open User Timeline", #selector(MainWindowController.openUserTimeline(_:)), "u")
         add("Open User Profile", #selector(MainWindowController.openUserProfile(_:)), "u", [.command])
         add("Add / Edit Alias…", #selector(MainWindowController.addAlias(_:)), "n", [.command, .shift])
+        add("Follow / Unfollow Author", #selector(MainWindowController.followAuthorSelection(_:)), "")
         add("Followers", #selector(MainWindowController.openFollowers(_:)), "")
         add("Following", #selector(MainWindowController.openFollowing(_:)), "")
-        add("Follow Hashtag…", #selector(MainWindowController.followHashtag(_:)), "")
+        add("Follow Hashtag…", #selector(MainWindowController.followHashtag(_:)), "h")
         statusMenu.addItem(.separator())
         add("Open in Browser", #selector(MainWindowController.openSelectionInBrowser(_:)), "")
 
@@ -121,6 +122,9 @@ enum MainMenu {
                                               action: #selector(MainWindowController.refreshAll(_:)),
                                               keyEquivalent: "r")
         refreshAll.keyEquivalentModifierMask = [.command, .shift]
+        timelineMenu.addItem(withTitle: "Load Older Posts",
+                             action: #selector(MainWindowController.loadOlderPosts(_:)),
+                             keyEquivalent: "")
         let goBack = timelineMenu.addItem(withTitle: "Undo Navigation",
                                           action: #selector(MainWindowController.goBack(_:)),
                                           keyEquivalent: "z")
@@ -138,6 +142,19 @@ enum MainMenu {
                                           keyEquivalent: "l")
         filter.keyEquivalentModifierMask = [.command]
         timelineMenu.addItem(.separator())
+        let find = timelineMenu.addItem(withTitle: "Find…",
+                                        action: #selector(MainWindowController.findInTimeline(_:)),
+                                        keyEquivalent: "f")
+        find.keyEquivalentModifierMask = [.command]
+        let findNext = timelineMenu.addItem(withTitle: "Find Next",
+                                            action: #selector(MainWindowController.findNext(_:)),
+                                            keyEquivalent: "g")
+        findNext.keyEquivalentModifierMask = [.command]
+        let findPrev = timelineMenu.addItem(withTitle: "Find Previous",
+                                            action: #selector(MainWindowController.findPrevious(_:)),
+                                            keyEquivalent: "g")
+        findPrev.keyEquivalentModifierMask = [.command, .shift]
+        timelineMenu.addItem(.separator())
         let pinTimeline = timelineMenu.addItem(withTitle: "Pin / Unpin Timeline",
                              action: #selector(MainWindowController.togglePin(_:)),
                              keyEquivalent: "p")
@@ -146,9 +163,10 @@ enum MainMenu {
                              action: #selector(MainWindowController.toggleMute(_:)),
                              keyEquivalent: "m")
         muteTimeline.keyEquivalentModifierMask = [.command]
-        timelineMenu.addItem(withTitle: "Auto-read New Posts",
+        let autoRead = timelineMenu.addItem(withTitle: "Auto-read New Posts",
                              action: #selector(MainWindowController.toggleAutoRead(_:)),
-                             keyEquivalent: "")
+                             keyEquivalent: "a")
+        autoRead.keyEquivalentModifierMask = [] // bare A, matching Windows
         // Reorder is driven by Shift+Up/Down on the posts table (matching Windows);
         // no menu key-equivalent, so VoiceOver speaks the new position, not the
         // menu title. These stay as discoverable, clickable menu entries.
@@ -190,6 +208,15 @@ enum MainMenu {
                             keyEquivalent: "")
         accountMenu.addItem(withTitle: "View My Following",
                             action: #selector(MainWindowController.viewMyFollowing(_:)),
+                            keyEquivalent: "")
+        accountMenu.addItem(withTitle: "View Muted Users",
+                            action: #selector(MainWindowController.viewMutedUsers(_:)),
+                            keyEquivalent: "")
+        accountMenu.addItem(withTitle: "View Blocked Users",
+                            action: #selector(MainWindowController.viewBlockedUsers(_:)),
+                            keyEquivalent: "")
+        accountMenu.addItem(withTitle: "View Follow Requests",
+                            action: #selector(MainWindowController.viewFollowRequests(_:)),
                             keyEquivalent: "")
         accountMenu.addItem(withTitle: "Followed Hashtags…",
                             action: #selector(MainWindowController.manageHashtags(_:)),

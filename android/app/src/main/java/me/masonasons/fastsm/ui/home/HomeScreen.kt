@@ -101,6 +101,9 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     // The User Analysis picker (opened from the overflow menu).
     var showUserAnalysis by remember { mutableStateOf(false) }
+    // Find in timeline (opened from the overflow menu).
+    var showFindDialog by remember { mutableStateOf(false) }
+    var findText by remember { mutableStateOf("") }
 
     // Keep the pager and the core's selected timeline in sync both ways.
     LaunchedEffect(currentTab) {
@@ -157,6 +160,18 @@ fun HomeScreen(
                             DropdownMenuItem(
                                 text = { Text("Add timeline or search") },
                                 onClick = { menuOpen = false; onOpenAddTimeline() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Find in timeline") },
+                                onClick = { menuOpen = false; showFindDialog = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Find next") },
+                                onClick = { menuOpen = false; viewModel.findNext() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Find previous") },
+                                onClick = { menuOpen = false; viewModel.findPrevious() },
                             )
                             DropdownMenuItem(
                                 text = { Text("User aliases") },
@@ -348,6 +363,30 @@ fun HomeScreen(
                 },
             )
         }
+    }
+
+    if (showFindDialog) {
+        AlertDialog(
+            onDismissRequest = { showFindDialog = false },
+            title = { Text("Find in timeline") },
+            text = {
+                OutlinedTextField(
+                    value = findText,
+                    onValueChange = { findText = it },
+                    label = { Text("Find posts containing") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showFindDialog = false
+                    viewModel.findInTimeline(findText)
+                }) { Text("Find") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFindDialog = false }) { Text("Cancel") }
+            },
+        )
     }
 
     if (showUserAnalysis) {

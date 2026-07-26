@@ -278,6 +278,63 @@ final class TimelineViewController: NSViewController, NSTableViewDataSource, NST
             : (rows.count == 1 ? "1 item" : "\(rows.count) items")
     }
 
+    // MARK: Find in timeline (client-side, mirroring the Windows app)
+
+    private var findQuery = ""
+
+    func findInTimeline() {
+        guard let query = promptForFindQuery(seed: findQuery),
+              !query.isEmpty else { return }
+        findQuery = query
+        // Start from the current row (inclusive), forward.
+        findFrom(start: tableView.selectedRow < 0 ? 0 : tableView.selectedRow, direction: 1)
+    }
+
+    func findNext() {
+        if findQuery.isEmpty { findInTimeline(); return }
+        findFrom(start: tableView.selectedRow + 1, direction: 1)
+    }
+
+    func findPrevious() {
+        if findQuery.isEmpty { findInTimeline(); return }
+        findFrom(start: tableView.selectedRow - 1, direction: -1)
+    }
+
+    /// Case-insensitive substring search over the posts' spoken text, scanning in
+    /// `direction` from `start` and wrapping around once. Selecting the match
+    /// normally (not the programmatic guard) notes the position to the core and
+    /// lets VoiceOver read the matched post; "Not found" is announced otherwise.
+    private func findFrom(start: Int, direction: Int) {
+        let count = rows.count
+        guard count > 0, !findQuery.isEmpty else { return }
+        let needle = findQuery.lowercased()
+        for offset in 0 ..< count {
+            let i = ((start + direction * offset) % count + count) % count
+            if rows[i].text.lowercased().contains(needle) {
+                tableView.selectRowIndexes(IndexSet(integer: i), byExtendingSelection: false)
+                tableView.scrollRowToVisible(i)
+                view.window?.makeFirstResponder(tableView)
+                return
+            }
+        }
+        Speech.announce("Not found")
+    }
+
+    private func promptForFindQuery(seed: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = "Find in Timeline"
+        alert.informativeText = "Find posts containing:"
+        alert.addButton(withTitle: "Find")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = seed
+        field.setAccessibilityLabel("Find in timeline")
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     // MARK: Actions (invoked via MainWindowController forwarders / Status menu)
 
     @objc func composePost(_ sender: Any?) { state.requestCompose(mode: "new") }
@@ -317,6 +374,11 @@ final class TimelineViewController: NSViewController, NSTableViewDataSource, NST
         guard let id = selectedRowId else { return }
         state.openThread(id: id)
     }
+    @objc func followAuthorSelection(_ sender: Any?) {
+        guard let id = selectedRowId else { return }
+        state.followToggleInPost(id: id)
+    }
+    @objc func loadOlderPosts(_ sender: Any?) { state.loadOlder(automatic: false) }
     @objc func openUserTimeline(_ sender: Any?) {
         guard let id = selectedRowId else { return }
         state.openUserTimeline(id: id)

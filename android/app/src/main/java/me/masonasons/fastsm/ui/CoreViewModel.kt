@@ -769,6 +769,46 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
     /** Report the reading position on the current timeline (persists it). */
     fun noteSelection(id: String) = core.dispatch("note_selection") { put("id", id) }
 
+    // Find in timeline (client-side, mirroring the desktop apps): a case-insensitive
+    // substring search over the posts' spoken text. A match moves the reading
+    // position there (scrolling to it) and speaks it through TalkBack; the query is
+    // remembered so Find Next/Previous continue from the current position.
+    private var findQuery = ""
+
+    fun findInTimeline(query: String) {
+        findQuery = query.trim()
+        findFrom(inclusive = true, direction = 1)
+    }
+
+    fun findNext() {
+        if (findQuery.isNotEmpty()) findFrom(inclusive = false, direction = 1)
+    }
+
+    fun findPrevious() {
+        if (findQuery.isNotEmpty()) findFrom(inclusive = false, direction = -1)
+    }
+
+    private fun findFrom(inclusive: Boolean, direction: Int) {
+        val tab = _currentTab.value
+        val rows = _rowsByTab.value[tab] ?: return
+        if (rows.isEmpty() || findQuery.isBlank()) return
+        val needle = findQuery.lowercase()
+        val currentId = _selectedIdByTab.value[tab].orEmpty()
+        val current = rows.indexOfFirst { it.id == currentId }.let { if (it < 0) 0 else it }
+        val start = if (inclusive) current else current + direction
+        val n = rows.size
+        for (offset in 0 until n) {
+            val i = ((start + direction * offset) % n + n) % n
+            if (rows[i].text.lowercase().contains(needle)) {
+                _selectedIdByTab.update { it + (tab to rows[i].id) } // scroll there
+                noteSelection(rows[i].id)                            // persist to the core
+                _announcements.tryEmit(rows[i].text)                 // speak the match
+                return
+            }
+        }
+        _announcements.tryEmit("Not found")
+    }
+
     fun toggleFavorite(id: String) = core.dispatch("toggle_favorite") { put("id", id) }
 
     fun toggleBoost(id: String) = core.dispatch("toggle_boost") { put("id", id) }
