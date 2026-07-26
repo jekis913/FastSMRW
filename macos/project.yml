@@ -30,6 +30,7 @@ targets:
       - path: ../core/src
         excludes:
           - net/winhttp_client.cpp
+          - net/curl_http_client.cpp # Linux-only transport
       - path: ../deps/stb_vorbis/stb_vorbis.c
     settings:
       base:

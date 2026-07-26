@@ -32,6 +32,7 @@ targets:
       - path: ../core/src
         excludes:
           - net/winhttp_client.cpp
+          - net/curl_http_client.cpp
           - sound/sound_manager.cpp
       # miniaudio's iOS backend talks to AVAudioSession (Objective-C), so this
       # one TU must be compiled as Objective-C++ here (plain C++ elsewhere).
