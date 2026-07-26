@@ -63,6 +63,9 @@ final class AppState {
     var onMediaPicker: ((MediaPicker) -> Void)?
     var onURLPicker: ((URLPicker) -> Void)?
     var onUpdateStatus: ((UpdateStatus) -> Void)?
+    /// Enter on a follow-request notification: show Accept/Reject for
+    /// (account_id, acct) and answer with setRelationship.
+    var onFollowRequestPrompt: ((String, String) -> Void)?
     /// The core's "UserActions" request (Enter on a user row when enter_user_action
     /// is "actions"): the Mac's equivalent is opening the user profile dialog.
     var onUserActionsMenu: (() -> Void)?
@@ -157,6 +160,16 @@ final class AppState {
            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            obj["event"] as? String == "invisible_ui_action" {
             if obj["action"] as? String == "UserActions" { onUserActionsMenu?() }
+            return
+        }
+        // Enter on a follow-request notification: the core asks the UI to show
+        // its native Accept/Reject choice, answered with set_relationship.
+        if let data = json.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           obj["event"] as? String == "follow_request_prompt" {
+            let accountId = obj["account_id"] as? String ?? ""
+            let acct = obj["acct"] as? String ?? ""
+            onFollowRequestPrompt?(accountId, acct)
             return
         }
         guard let event = CoreEvent.decode(json) else { return }

@@ -69,10 +69,12 @@ fun StatusRow(
     onAddAlias: (String) -> Unit,
     onReport: (id: String, category: String, comment: String, forward: Boolean) -> Unit,
     onCopy: (String) -> Unit,
+    onSetRelationship: (accountId: String, action: String, acct: String) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
+    var showFollowRequest by remember { mutableStateOf(false) }
 
     // The user's configured action list, in order, keeping only the actions
     // that apply to this post (the same list drives TalkBack's custom actions
@@ -122,11 +124,13 @@ fun StatusRow(
     }
     val actions = menuActions.toAccessibilityActions()
 
-    // Primary open: a grouped like/boost notification opens the list of everyone in
-    // the group; every other row opens its thread.
-    val primaryOpen: () -> Unit = when (row.groupActors) {
-        "favorited_by" -> ({ onOpenFavoritedBy(row.id) })
-        "reblogged_by" -> ({ onOpenRebloggedBy(row.id) })
+    // Primary open: a follow-request notification offers Accept/Reject; a grouped
+    // like/boost notification opens the list of everyone in the group; every
+    // other row opens its thread.
+    val primaryOpen: () -> Unit = when {
+        row.followRequest -> ({ showFollowRequest = true })
+        row.groupActors == "favorited_by" -> ({ onOpenFavoritedBy(row.id) })
+        row.groupActors == "reblogged_by" -> ({ onOpenRebloggedBy(row.id) })
         else -> ({ onOpenThread(row.id) })
     }
 
@@ -165,6 +169,26 @@ fun StatusRow(
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showFollowRequest) {
+        AlertDialog(
+            onDismissRequest = { showFollowRequest = false },
+            title = { Text("Follow request") },
+            text = { Text("Accept the follow request from @${row.acct}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showFollowRequest = false
+                    onSetRelationship(row.accountId, "authorize_request", row.acct)
+                }) { Text("Accept") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showFollowRequest = false
+                    onSetRelationship(row.accountId, "reject_request", row.acct)
+                }) { Text("Reject") }
             },
         )
     }

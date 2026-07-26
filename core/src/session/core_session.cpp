@@ -3536,6 +3536,15 @@ void CoreSession::cmd_perform_action(const json& cmd) {
             emit({{"event", "invisible_ui_action"}, {"action", "UserActions"}}); // the batch menu
             return;
         }
+        // A follow-request notification: Enter acts on the request. The front end
+        // shows its native Accept/Reject choice and answers with set_relationship.
+        if (const Notification* n = it->notification();
+            n && n->type == Notification::Kind::FollowRequest) {
+            emit({{"event", "follow_request_prompt"},
+                  {"account_id", n->account.id},
+                  {"acct", n->account.acct.empty() ? n->account.username : n->account.acct}});
+            return;
+        }
         // A grouped like/boost notification: Enter opens the list of everyone in the
         // group (all the people who favorited / boosted the post).
         if (const Notification* n = it->notification();

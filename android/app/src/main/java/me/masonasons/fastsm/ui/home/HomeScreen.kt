@@ -269,6 +269,7 @@ fun HomeScreen(
                 onAddAlias = viewModel::beginAlias,
                 onReport = viewModel::reportPost,
                 onCopy = viewModel::copyRow,
+                onSetRelationship = viewModel::setRelationship,
             )
         }
     }
@@ -593,6 +594,7 @@ private fun StatusList(
     onAddAlias: (String) -> Unit,
     onReport: (id: String, category: String, comment: String, forward: Boolean) -> Unit,
     onCopy: (String) -> Unit,
+    onSetRelationship: (accountId: String, action: String, acct: String) -> Unit,
 ) {
     if (rows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -662,6 +664,7 @@ private fun StatusList(
                 onAddAlias = onAddAlias,
                 onReport = onReport,
                 onCopy = onCopy,
+                onSetRelationship = onSetRelationship,
             )
         }
     }

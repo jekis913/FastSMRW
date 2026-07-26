@@ -508,6 +508,12 @@ void MainWindow::bind_current_to_view() {
     updating_ = true;
     gtk_list_store_clear(posts_store_);
     Timeline* tc = current();
+    // User lists allow a multi-selection (Shift+arrows) so batch actions can act
+    // on several users at once, like the Windows list view. Post lists stay
+    // single-selection.
+    gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(posts_view_)),
+                                tc && tc->user_list ? GTK_SELECTION_MULTIPLE
+                                                    : GTK_SELECTION_SINGLE);
     if (tc) {
         for (const auto& row : tc->rows) {
             GtkTreeIter iter;
@@ -781,7 +787,184 @@ void MainWindow::run_post_action(const std::string& action) {
 }
 
 void MainWindow::do_enter_post_action() {
+    // A grouped like/boost notification: Enter opens the list of everyone in it.
+    Timeline* tc = current();
+    const int row = selected_row();
+    if (tc && row >= 0 && row < static_cast<int>(tc->rows.size())) {
+        const Row& r = tc->rows[static_cast<size_t>(row)];
+        if (r.group_actors == "favorited_by") {
+            dispatch_cmd({{"cmd", "open_favorited_by"}, {"id", r.id}});
+            return;
+        }
+        if (r.group_actors == "reblogged_by") {
+            dispatch_cmd({{"cmd", "open_reblogged_by"}, {"id", r.id}});
+            return;
+        }
+    }
+    // The Conversations feed is a list of threads: Enter always opens the thread,
+    // whatever the general post-Enter setting is.
+    if (tc && tc->enter_opens_thread) {
+        const std::string id = selected_id();
+        if (!id.empty())
+            dispatch_cmd({{"cmd", "open_thread"}, {"id", id}});
+        return;
+    }
     run_post_action(settings_.value("enter_post_action", std::string("post_info")));
+}
+
+// Enter on a follow-request notification: a two-item Accept/Reject popup, like
+// the Windows app. The command strings are built here, synchronously, so the
+// menu never touches the (mutable) row list after it pops up.
+void MainWindow::do_follow_request_action(const Row& r) {
+    GtkWidget* menu = gtk_menu_new();
+    const char* labels[] = {"_Accept", "_Reject"};
+    const char* actions[] = {"authorize_request", "reject_request"};
+    for (int i = 0; i < 2; ++i) {
+        GtkWidget* mi = gtk_menu_item_new_with_mnemonic(labels[i]);
+        json cmd(json::object());
+        cmd["cmd"] = "set_relationship";
+        cmd["account_id"] = r.account_id;
+        cmd["acct"] = r.acct;
+        cmd["action"] = actions[i];
+        g_object_set_data_full(G_OBJECT(mi), "fastsm-cmd", g_strdup(cmd.dump().c_str()), g_free);
+        g_signal_connect(mi, "activate", G_CALLBACK(+[](GtkMenuItem* m, gpointer u) {
+                             const auto* s = static_cast<const char*>(
+                                 g_object_get_data(G_OBJECT(m), "fastsm-cmd"));
+                             if (s)
+                                 static_cast<MainWindow*>(u)->dispatch_cmd(json::parse(s));
+                         }),
+                         this);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+    }
+    gtk_widget_show_all(menu);
+    g_signal_connect(menu, "deactivate", G_CALLBACK(+[](GtkMenuShell* m, gpointer) {
+                         g_idle_add(
+                             +[](gpointer w) -> gboolean {
+                                 gtk_widget_destroy(GTK_WIDGET(w));
+                                 return G_SOURCE_REMOVE;
+                             },
+                             m);
+                     }),
+                     nullptr);
+    gtk_menu_popup_at_widget(GTK_MENU(menu), posts_view_, GDK_GRAVITY_CENTER, GDK_GRAVITY_CENTER,
+                             nullptr);
+}
+
+// Enter on a user-list row runs the configurable action (Behavior settings),
+// mirroring the Windows do_enter_user_action.
+void MainWindow::do_enter_user_action() {
+    const std::string a = settings_.value("enter_user_action", std::string("actions"));
+    const std::string id = selected_id();
+    if (a == "profile") {
+        if (!id.empty())
+            dispatch_cmd({{"cmd", "open_user_profile"}, {"id", id}});
+    } else if (a == "timeline") {
+        if (!id.empty())
+            dispatch_cmd({{"cmd", "open_user_timeline"}, {"id", id}});
+    } else {
+        show_user_actions();
+    }
+}
+
+// The selected user rows' ids (the multi-selection), falling back to the focused
+// row — the same collection rule as the Windows show_user_actions.
+std::vector<std::string> MainWindow::selected_user_row_ids() {
+    std::vector<std::string> ids;
+    Timeline* tc = current();
+    if (!tc)
+        return ids;
+    GtkTreeSelection* sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(posts_view_));
+    GList* paths = gtk_tree_selection_get_selected_rows(sel, nullptr);
+    for (GList* p = paths; p; p = p->next) {
+        const int row = gtk_tree_path_get_indices(static_cast<GtkTreePath*>(p->data))[0];
+        if (row >= 0 && row < static_cast<int>(tc->rows.size()))
+            ids.push_back(tc->rows[static_cast<size_t>(row)].id);
+    }
+    g_list_free_full(paths, reinterpret_cast<GDestroyNotify>(gtk_tree_path_free));
+    if (ids.empty()) {
+        const int row = selected_row();
+        if (row >= 0 && row < static_cast<int>(tc->rows.size()))
+            ids.push_back(tc->rows[static_cast<size_t>(row)].id);
+    }
+    return ids;
+}
+
+// The user-row actions menu, acting on every selected row ("(N)" in the labels
+// for a multi-selection). On the Follow Requests list it offers Accept/Reject
+// instead of the follow/mute/block set — same shape as the Windows menu.
+void MainWindow::show_user_actions() {
+    Timeline* tc = current();
+    if (!tc)
+        return;
+    const std::vector<std::string> ids = selected_user_row_ids();
+    if (ids.empty())
+        return;
+    const bool requests = tc->kind == "followRequests";
+    static const char* kUserLabels[] = {"_Follow", "_Unfollow", "_Mute",
+                                        "Un_mute", "_Block",    "Unbl_ock"};
+    static const char* kUserActs[] = {"follow", "unfollow", "mute", "unmute", "block", "unblock"};
+    static const char* kReqLabels[] = {"_Accept", "_Reject"};
+    static const char* kReqActs[] = {"authorize_request", "reject_request"};
+    const char* const* labels = requests ? kReqLabels : kUserLabels;
+    const char* const* acts = requests ? kReqActs : kUserActs;
+    const int count = requests ? 2 : 6;
+    json jids(json::array());
+    for (const auto& id : ids)
+        jids.push_back(id);
+    const std::string ids_json = jids.dump();
+    GtkWidget* menu = gtk_menu_new();
+    for (int i = 0; i < count; ++i) {
+        std::string label = labels[i];
+        if (ids.size() > 1)
+            label += " (" + std::to_string(ids.size()) + ")";
+        GtkWidget* mi = gtk_menu_item_new_with_mnemonic(label.c_str());
+        g_object_set_data_full(G_OBJECT(mi), "fastsm-act", g_strdup(acts[i]), g_free);
+        g_object_set_data_full(G_OBJECT(mi), "fastsm-ids", g_strdup(ids_json.c_str()), g_free);
+        g_signal_connect(mi, "activate", G_CALLBACK(+[](GtkMenuItem* m, gpointer u) {
+                             const auto* act = static_cast<const char*>(
+                                 g_object_get_data(G_OBJECT(m), "fastsm-act"));
+                             const auto* rids = static_cast<const char*>(
+                                 g_object_get_data(G_OBJECT(m), "fastsm-ids"));
+                             if (!act || !rids)
+                                 return;
+                             std::vector<std::string> parsed;
+                             for (const auto& v : json::parse(rids))
+                                 parsed.push_back(v.get<std::string>());
+                             static_cast<MainWindow*>(u)->run_user_action(act, parsed);
+                         }),
+                         this);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
+    }
+    gtk_widget_show_all(menu);
+    g_signal_connect(menu, "deactivate", G_CALLBACK(+[](GtkMenuShell* m, gpointer) {
+                         g_idle_add(
+                             +[](gpointer w) -> gboolean {
+                                 gtk_widget_destroy(GTK_WIDGET(w));
+                                 return G_SOURCE_REMOVE;
+                             },
+                             m);
+                     }),
+                     nullptr);
+    gtk_menu_popup_at_widget(GTK_MENU(menu), posts_view_, GDK_GRAVITY_CENTER, GDK_GRAVITY_CENTER,
+                             nullptr);
+}
+
+void MainWindow::run_user_action(const std::string& action,
+                                 const std::vector<std::string>& row_ids) {
+    if (row_ids.empty())
+        return;
+    const std::string many = std::to_string(row_ids.size()) + " users?";
+    if (action == "block" && settings_.value("confirm_block", true)) {
+        if (!confirm(row_ids.size() > 1 ? "Block " + many : "Block this user?", "Block"))
+            return;
+    } else if (action == "unblock" && settings_.value("confirm_unblock", false)) {
+        if (!confirm(row_ids.size() > 1 ? "Unblock " + many : "Unblock this user?", "Unblock"))
+            return;
+    }
+    json ids(json::array());
+    for (const auto& id : row_ids)
+        ids.push_back(id);
+    dispatch_cmd({{"cmd", "user_action"}, {"action", action}, {"ids", std::move(ids)}});
 }
 
 void MainWindow::do_secondary_post_action() {
@@ -1093,6 +1276,8 @@ void MainWindow::on_event(const std::string& js) {
         ev_action_catalog(e);
     else if (ev == "invisible_ui_action")
         ev_invisible_ui_action(e);
+    else if (ev == "follow_request_prompt")
+        ev_follow_request_prompt(e);
     else if (ev == "hashtag_prompt")
         ev_hashtag_prompt(e);
     else if (ev == "lists")
@@ -1423,9 +1608,39 @@ void MainWindow::ev_invisible_ui_action(const json& e) {
         do_find_prev();
     } else if (action == "NewTimeline") {
         dispatch_cmd({{"cmd", "get_spawnable"}});
+    } else if (action == "UserActions") {
+        show_user_actions();
     }
-    // Other UI-side actions (KeymapManager, media, dialogs not yet built on
-    // Linux) are ignored for now.
+    // Other UI-side actions (media, dialogs not yet built on Linux) are
+    // ignored for now.
+}
+
+// The core-driven accept/reject choice (the core's Enter action can't show UI).
+// A dialog works even while the window is hidden, unlike the row popup menu.
+void MainWindow::ev_follow_request_prompt(const json& e) {
+    const std::string account_id = e.value("account_id", std::string{});
+    const std::string acct = e.value("acct", std::string{});
+    GtkWidget* dlg = gtk_dialog_new_with_buttons(
+        "Follow request", GTK_WINDOW(window_),
+        static_cast<GtkDialogFlags>(GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT), "_Accept",
+        GTK_RESPONSE_YES, "_Reject", GTK_RESPONSE_NO, "_Cancel", GTK_RESPONSE_CANCEL, nullptr);
+    GtkWidget* content = gtk_dialog_get_content_area(GTK_DIALOG(dlg));
+    const std::string text = "Accept the follow request from @" + acct + "?";
+    GtkWidget* label = gtk_label_new(text.c_str());
+    gtk_widget_set_margin_start(label, 12);
+    gtk_widget_set_margin_end(label, 12);
+    gtk_widget_set_margin_top(label, 12);
+    gtk_widget_set_margin_bottom(label, 12);
+    gtk_container_add(GTK_CONTAINER(content), label);
+    gtk_widget_show_all(dlg);
+    const gint response = gtk_dialog_run(GTK_DIALOG(dlg));
+    gtk_widget_destroy(dlg);
+    if (response != GTK_RESPONSE_YES && response != GTK_RESPONSE_NO)
+        return;
+    dispatch_cmd({{"cmd", "set_relationship"},
+                  {"account_id", account_id},
+                  {"acct", acct},
+                  {"action", response == GTK_RESPONSE_YES ? "authorize_request" : "reject_request"}});
 }
 
 void MainWindow::ev_spawnable(const json& e) {
@@ -2490,9 +2705,18 @@ gboolean MainWindow::on_posts_key(GtkWidget*, GdkEventKey* event, gpointer user)
         self->first_letter_nav(static_cast<gunichar>('a' + (lower - GDK_KEY_a)));
         return TRUE;
     }
-    // Shift+Enter: the secondary interact action (Behavior settings).
+    // Shift+Enter: the secondary interact action (Behavior settings). Follow
+    // requests and user lists keep their Enter behavior even with Shift held.
     if (shift && !ctrl && !alt && lower == GDK_KEY_Return) {
-        self->do_secondary_post_action();
+        Timeline* tc = self->current();
+        const int row = self->selected_row();
+        if (tc && row >= 0 && row < static_cast<int>(tc->rows.size()) &&
+            tc->rows[static_cast<size_t>(row)].follow_request)
+            self->do_follow_request_action(tc->rows[static_cast<size_t>(row)]);
+        else if (tc && tc->user_list)
+            self->do_enter_user_action();
+        else
+            self->do_secondary_post_action();
         return TRUE;
     }
     // Ctrl+arrows: movement units — jump by the active unit, cycle which one.
@@ -2562,9 +2786,22 @@ gboolean MainWindow::on_posts_key(GtkWidget*, GdkEventKey* event, gpointer user)
             self->dispatch_cmd({{"cmd", "open_thread"}, {"id", id}});
         return TRUE;
     }
-    case GDK_KEY_Return: // the configurable interact action (default: post info)
+    case GDK_KEY_Return: { // follow requests and user lists first; else the
+                           // configurable interact action (default: post info)
+        Timeline* tc = self->current();
+        const int row = self->selected_row();
+        if (tc && row >= 0 && row < static_cast<int>(tc->rows.size()) &&
+            tc->rows[static_cast<size_t>(row)].follow_request) {
+            self->do_follow_request_action(tc->rows[static_cast<size_t>(row)]);
+            return TRUE;
+        }
+        if (tc && tc->user_list) {
+            self->do_enter_user_action();
+            return TRUE;
+        }
         self->do_enter_post_action();
         return TRUE;
+    }
     case GDK_KEY_u: { // open the author's posts
         const std::string id = self->selected_id();
         if (!id.empty())

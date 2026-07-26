@@ -90,6 +90,11 @@ private:
     void do_enter_post_action();
     void do_secondary_post_action();
     void run_post_action(const std::string& action);
+    void do_follow_request_action(const Row& r); // accept/reject a follow request (Enter)
+    void do_enter_user_action();                 // configurable Enter on user-list rows
+    void show_user_actions();                    // user-row actions menu (Accept/Reject on Follow Requests)
+    std::vector<std::string> selected_user_row_ids(); // the multi-selection, else the focused row
+    void run_user_action(const std::string& action, const std::vector<std::string>& row_ids);
     void do_find();
     void do_find_next();
     void do_find_prev();
@@ -140,6 +145,7 @@ private:
     void ev_action_catalog(const nlohmann::json& e);
     void open_keymap_manager();
     void ev_invisible_ui_action(const nlohmann::json& e);
+    void ev_follow_request_prompt(const nlohmann::json& e); // core-driven accept/reject choice
     void do_settings();
     void ev_hashtag_prompt(const nlohmann::json& e);
 

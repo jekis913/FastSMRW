@@ -135,6 +135,7 @@ private:
     void show_user_actions(); // batch follow/mute/block on a user list
     void show_status_context_menu(LPARAM lp); // Status menu via right-click / Shift+F10 / Apps key
     void do_follow_request_action(const Row& r); // accept/reject a follow request (Enter)
+    void ev_follow_request_prompt(const nlohmann::json& e); // core-driven accept/reject choice
     void do_enter_post_action();                 // Enter on a post (configurable)
     void do_enter_user_action();                 // Enter on a user (configurable)
     void do_secondary_post_action();             // Shift+Enter on a post (configurable)

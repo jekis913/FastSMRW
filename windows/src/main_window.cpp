@@ -1103,6 +1103,24 @@ void MainWindow::do_follow_request_action(const Row& r) {
                   {"action", action}});
 }
 
+// The core-driven accept/reject choice (the invisible interface's Enter action
+// routes through the core, which can't show UI). A message box works even while
+// the main window is hidden, unlike the row popup menu.
+void MainWindow::ev_follow_request_prompt(const json& e) {
+    const std::string account_id = e.value("account_id", std::string{});
+    const std::string acct = e.value("acct", std::string{});
+    const std::wstring msg = L"Accept the follow request from @" + to_wide(acct) +
+                             L"?\nYes accepts it, No rejects it.";
+    const int chosen = MessageBoxW(hwnd_, msg.c_str(), L"Follow request",
+                                   MB_YESNOCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
+    if (chosen != IDYES && chosen != IDNO)
+        return;
+    dispatch_cmd({{"cmd", "set_relationship"},
+                  {"account_id", account_id},
+                  {"acct", acct},
+                  {"action", chosen == IDYES ? "authorize_request" : "reject_request"}});
+}
+
 void MainWindow::update_menu_checks(HMENU menu) {
     // No-op unless this popup is the Status menu (which owns these items).
     if (GetMenuState(menu, ID_BOOST, MF_BYCOMMAND) == static_cast<UINT>(-1))
@@ -2242,6 +2260,8 @@ void MainWindow::on_event(const std::string& js) {
         ev_action_catalog(e);
     else if (ev == "invisible_ui_action")
         ev_invisible_ui_action(e);
+    else if (ev == "follow_request_prompt")
+        ev_follow_request_prompt(e);
     else if (ev == "media_open")
         ev_media_open(e);
     else if (ev == "copy_to_clipboard")

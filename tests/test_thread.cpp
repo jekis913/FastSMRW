@@ -195,3 +195,63 @@ void test_mastodon_thread_fetch() {
         CHECK_EQ(page.items[2].id(), std::string("s:3"));
     }
 }
+
+namespace {
+// Serves /api/v2/notifications with one follow_request group (status-less, as the
+// real API sends it) and one grouped favourite, with the side-loaded accounts.
+struct FakeGroupedNotifsHttp : net::IHttpClient {
+    net::HttpResponse send(const net::HttpRequest& req) override {
+        net::HttpResponse res;
+        res.status = 200;
+        if (req.url.find("/api/v2/notifications") == std::string::npos)
+            return res; // anything else: empty 200 (shape mismatch -> would fall to v1)
+        res.body = R"({
+          "accounts":[
+            {"id":"900","acct":"carol","username":"carol","display_name":"Carol"},
+            {"id":"300","acct":"alice","username":"alice","display_name":"Alice"}],
+          "statuses":[
+            {"id":"100","content":"<p>hi</p>","account":{"id":"1","acct":"me"},
+             "created_at":"2024-06-28T11:00:00.000Z"}],
+          "notification_groups":[
+            {"group_key":"ungrouped-7001","notifications_count":1,"type":"follow_request",
+             "most_recent_notification_id":7001,"page_min_id":"7001","page_max_id":"7001",
+             "latest_page_notification_at":"2024-06-28T12:20:00.000Z",
+             "sample_account_ids":["900"]},
+            {"group_key":"favourite-100","notifications_count":3,"type":"favourite",
+             "most_recent_notification_id":7000,"page_min_id":"6990","page_max_id":"7000",
+             "latest_page_notification_at":"2024-06-28T12:10:00.000Z",
+             "sample_account_ids":["300"],"status_id":"100"}]
+        })";
+        return res;
+    }
+};
+} // namespace
+
+// A follow-request notification fetched through the grouped (v2) path must keep
+// its kind and its requester's account, or the UI can't offer Accept/Reject on it.
+void test_mastodon_grouped_follow_request_fetch() {
+    FakeGroupedNotifsHttp http;
+    MastodonCredentials cred;
+    cred.instance_url = "https://example.social";
+    cred.access_token = "tok";
+    User me;
+    me.id = "me";
+    MastodonAccount account(cred, me, &http);
+
+    const TimelinePage page =
+        account.items(TimelineSource::notifications(), 40, PageCursor::start());
+    CHECK_EQ(page.items.size(), size_t(2));
+    if (page.items.size() != 2)
+        return;
+    const Notification* fr = page.items[0].notification();
+    CHECK(fr != nullptr);
+    if (fr) {
+        CHECK(fr->type == Notification::Kind::FollowRequest);
+        CHECK_EQ(fr->account.id, std::string("900")); // resolved from the side-load
+        CHECK_EQ(fr->account.acct, std::string("carol"));
+    }
+    const Notification* fav = page.items[1].notification();
+    CHECK(fav != nullptr);
+    if (fav)
+        CHECK(fav->type == Notification::Kind::Favourite);
+}

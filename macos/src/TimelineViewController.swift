@@ -83,6 +83,11 @@ final class TimelineViewController: NSViewController, NSTableViewDataSource, NST
         // Enter on a user row with enter_user_action = "actions" (the default):
         // the core asks for the platform "user actions" affordance — the profile.
         state.onUserActionsMenu = { [weak self] in self?.openUserProfile(nil) }
+        // Enter on a follow-request notification: the core asks for the native
+        // Accept/Reject choice, answered with set_relationship.
+        state.onFollowRequestPrompt = { [weak self] accountId, acct in
+            self?.promptFollowRequest(accountId: accountId, acct: acct)
+        }
         tableView.onCommandReturn = { [weak self] in self?.openLinksForSelection(nil) }
         // Option+arrows drive movement units (Up/Down jump by the unit, Left/Right
         // pick the unit). Handled on the table (not menu key-equivalents) so
@@ -318,6 +323,31 @@ final class TimelineViewController: NSViewController, NSTableViewDataSource, NST
             }
         }
         Speech.announce("Not found")
+    }
+
+    /// Accept/Reject sheet for a follow-request notification (Enter on its row).
+    private func promptFollowRequest(accountId: String, acct: String) {
+        let alert = NSAlert()
+        alert.messageText = "Follow request"
+        alert.informativeText = "Accept the follow request from @\(acct)?"
+        alert.addButton(withTitle: "Accept")
+        alert.addButton(withTitle: "Reject")
+        alert.addButton(withTitle: "Cancel")
+        let respond: (NSApplication.ModalResponse) -> Void = { [weak self] r in
+            guard let self else { return }
+            if r == .alertFirstButtonReturn {
+                self.state.setRelationship(accountId: accountId, action: "authorize_request",
+                                           acct: acct)
+            } else if r == .alertSecondButtonReturn {
+                self.state.setRelationship(accountId: accountId, action: "reject_request",
+                                           acct: acct)
+            }
+        }
+        if let window = view.window {
+            alert.beginSheetModal(for: window, completionHandler: respond)
+        } else {
+            respond(alert.runModal())
+        }
     }
 
     private func promptForFindQuery(seed: String) -> String? {

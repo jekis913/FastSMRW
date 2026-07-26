@@ -268,6 +268,28 @@ final class MainViewController: UIViewController {
             Media.present(media, from: self.topPresenter)
         }
         state.onMediaPicker = { [weak self] picker in self?.showMediaPicker(picker) }
+        // Activating a follow-request notification: the core asks for the native
+        // Accept/Reject choice, answered with set_relationship.
+        state.onFollowRequestPrompt = { [weak self] accountId, acct in
+            self?.promptFollowRequest(accountId: accountId, acct: acct)
+        }
+    }
+
+    /// Accept/Reject a follow request (activating its notification row).
+    private func promptFollowRequest(accountId: String, acct: String) {
+        let alert = UIAlertController(title: "Follow request",
+                                      message: "Accept the follow request from @\(acct)?",
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Accept", style: .default) { [weak self] _ in
+            self?.state.setRelationship(accountId: accountId, action: "authorize_request",
+                                       acct: acct)
+        })
+        alert.addAction(UIAlertAction(title: "Reject", style: .destructive) { [weak self] _ in
+            self?.state.setRelationship(accountId: accountId, action: "reject_request",
+                                       acct: acct)
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        topPresenter.present(alert, animated: true)
     }
 
     // MARK: Timeline tabs

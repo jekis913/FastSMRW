@@ -90,6 +90,7 @@ void test_mastodon_thread_fetch();
 void test_mastodon_thread_folding();
 void test_mastodon_instance_max_chars();
 void test_mastodon_user_pinned_posts();
+void test_mastodon_grouped_follow_request_fetch();
 
 // From test_keymap.cpp
 void test_keymap_normalize();
@@ -200,6 +201,7 @@ int main() {
     test_mastodon_thread_folding();
     test_mastodon_instance_max_chars();
     test_mastodon_user_pinned_posts();
+    test_mastodon_grouped_follow_request_fetch();
     test_keymap_normalize();
     test_keymap_default_and_catalog();
     test_keymap_parse_and_serialize();

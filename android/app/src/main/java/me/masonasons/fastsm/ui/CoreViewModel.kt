@@ -49,6 +49,10 @@ data class RowUi(
     // Grouped like/boost notification: "favorited_by"/"reblogged_by" (or "") — tap
     // opens the list of everyone in the group instead of the thread.
     val groupActors: String,
+    // A follow-request notification: tap offers Accept/Reject for [accountId].
+    val followRequest: Boolean,
+    val accountId: String,
+    val acct: String,
     val favoritesCount: Int, // >0 -> "See who favorited" is offered
     val boostsCount: Int,    // >0 -> "See who boosted" is offered
     // The post's links (present only when the "expand_links" action is on) —
@@ -405,6 +409,9 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
                                 isReply = r.optBoolean("is_reply"),
                                 muted = r.optBoolean("muted"),
                                 groupActors = r.optString("group_actors"),
+                                followRequest = r.optBoolean("follow_request"),
+                                accountId = r.optString("account_id"),
+                                acct = r.optString("acct"),
                                 favoritesCount = r.optInt("favorites_count"),
                                 boostsCount = r.optInt("boosts_count"),
                                 links = r.optJSONArray("links")?.let { la ->
