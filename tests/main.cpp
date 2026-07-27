@@ -107,6 +107,7 @@ void test_update_installer_asset();
 // From test_filters.cpp
 void test_client_filter_post_types();
 void test_client_filter_media_and_me();
+void test_client_filter_bluesky_unfollowed_replies();
 void test_client_filter_text();
 void test_server_filter_metadata();
 
@@ -212,6 +213,7 @@ int main() {
     test_update_installer_asset();
     test_client_filter_post_types();
     test_client_filter_media_and_me();
+    test_client_filter_bluesky_unfollowed_replies();
     test_client_filter_text();
     test_server_filter_metadata();
     test_refresh_fills_gap_below_streamed_top();

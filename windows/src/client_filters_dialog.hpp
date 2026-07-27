@@ -12,6 +12,7 @@ struct ClientFilterValues {
     bool original = true;
     bool replies = true;
     bool replies_to_me = true;
+    bool replies_to_unfollowed = true;
     bool threads = true;
     bool boosts = true;
     bool quotes = true;

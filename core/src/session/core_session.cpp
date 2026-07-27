@@ -38,6 +38,7 @@ constexpr const char* kUpdateRepo = "masonasons/FastSMRW";
 json client_filter_to_json(const ClientFilter& f) {
     return {{"original", f.original},         {"replies", f.replies},
             {"replies_to_me", f.replies_to_me}, {"threads", f.threads},
+            {"replies_to_unfollowed", f.replies_to_unfollowed},
             {"boosts", f.boosts},             {"quotes", f.quotes},
             {"media", f.media},               {"no_media", f.no_media},
             {"my_posts", f.my_posts},         {"my_replies", f.my_replies},
@@ -49,6 +50,7 @@ ClientFilter client_filter_from_json(const json& j) {
     f.original = j.value("original", true);
     f.replies = j.value("replies", true);
     f.replies_to_me = j.value("replies_to_me", true);
+    f.replies_to_unfollowed = j.value("replies_to_unfollowed", true);
     f.threads = j.value("threads", true);
     f.boosts = j.value("boosts", true);
     f.quotes = j.value("quotes", true);

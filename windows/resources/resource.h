@@ -182,6 +182,7 @@
 #define IDC_CF_MY_REPLIES   460
 #define IDC_CF_TEXT         461
 #define IDC_CF_CLEAR        462
+#define IDC_CF_REPLIES_UNFOLLOWED 463
 
 // Server Filters manager (Mastodon /api/v2/filters).
 #define IDD_SERVER_FILTERS  470

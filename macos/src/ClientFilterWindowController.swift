@@ -25,6 +25,8 @@ final class ClientFilterWindowController: NSWindowController {
             ("Original posts", "original", filter.original),
             ("Replies", "replies", filter.replies),
             ("Replies to me", "replies_to_me", filter.repliesToMe),
+            ("Bluesky replies to people you don't follow", "replies_to_unfollowed",
+             filter.repliesToUnfollowed),
             ("Threads (self-replies)", "threads", filter.threads),
             ("Boosts", "boosts", filter.boosts),
             ("Quotes", "quotes", filter.quotes),

@@ -274,14 +274,19 @@ Status map_feed_item(const json& item) {
     const json* post = obj(item, "post");
     Status inner = post ? map_post(*post) : Status{};
 
-    // The feed carries the reply parent as a full post view (with its author),
-    // so a reply row can name who it's replying to. The bare record only has
-    // the parent URI, so this is the one place the handle is available.
+    // The feed carries the reply parent as a full post view (with its author and
+    // viewer relationship), so capture everything needed by reply presentation
+    // and client filtering here without making another request.
     if (const json* reply = obj(item, "reply"))
         if (const json* parent = obj(*reply, "parent"))
-            if (const json* author = obj(*parent, "author"))
+            if (const json* author = obj(*parent, "author")) {
+                if (std::string did = str(*author, "did"); !did.empty())
+                    inner.reply_to_author_id = did;
                 if (std::string h = str(*author, "handle"); !h.empty())
                     inner.reply_to_handle = h;
+                if (const json* viewer = obj(*author, "viewer"))
+                    inner.reply_to_author_followed = !str(*viewer, "following").empty();
+            }
 
     // A repost "reason" turns the row into a boost authored by the reposter.
     if (const json* reason = obj(item, "reason")) {
