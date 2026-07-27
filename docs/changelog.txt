@@ -6,6 +6,7 @@ FastSMRW changelog
 
 - New: optionally hide Bluesky replies to people you do not follow with the timeline's client filters.
 - Fixed: pressing Enter on a follow request offers Accept and Reject again — and now works in every app, including the invisible interface, the Mac, iPhone, Android, and Linux.
+- Fixed: on Android, the timeline tab bar no longer hides behind the on-screen navigation bar when set to the bottom of the screen, so the tabs are always visible and reachable by touch and TalkBack.
 - New: on Linux, pressing Enter on a user list offers the same user actions as Windows — follow, mute or block, and Accept or Reject on the Follow Requests list — and Shift+arrows select several users to act on at once.
 - New: find posts in a timeline is now in every app — Command+F, Command+G and Command+Shift+G on the Mac, and Find in the More menu on iPhone and Android (with iPad keyboard shortcuts) — joining Windows and Linux.
 - New: on the Mac, view your muted users, blocked users, and pending follow requests from the Account menu.

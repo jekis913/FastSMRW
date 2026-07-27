@@ -8,9 +8,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -228,7 +231,15 @@ fun HomeScreen(
                 if (!tabsAtBottom) tabBar()
             }
         },
-        bottomBar = { if (tabsAtBottom) tabBar() },
+        bottomBar = {
+            // TopAppBar applies status-bar insets on its own, but this plain Row
+            // doesn't — without navigationBars padding here, the bottom-docked
+            // tab strip renders under the gesture/button nav bar and becomes
+            // untouchable and unreachable to TalkBack.
+            if (tabsAtBottom) {
+                Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars)) { tabBar() }
+            }
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = viewModel::composeNew) {
                 Icon(Icons.Filled.Edit, contentDescription = "New post")
