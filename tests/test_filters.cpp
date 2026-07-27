@@ -109,6 +109,42 @@ void test_client_filter_media_and_me() {
     CHECK(client_filter_should_show(f, to_me, me));
 }
 
+void test_client_filter_bluesky_unfollowed_replies() {
+    const std::string me = "did:plc:me";
+    ClientFilter f;
+    f.replies_to_unfollowed = false;
+
+    TimelineItem reply = make_status("1", "did:plc:author");
+    Status* post = reply.mutable_status();
+    post->platform = Platform::Bluesky;
+    post->in_reply_to_id = "parent";
+    post->reply_to_author_id = "did:plc:stranger";
+    post->reply_to_author_followed = false;
+    CHECK(client_filter_should_show(ClientFilter{}, reply, me)); // default preserves visibility
+    CHECK(!client_filter_should_show(f, reply, me));
+
+    post->reply_to_author_followed = true;
+    CHECK(client_filter_should_show(f, reply, me));
+
+    post->reply_to_author_followed.reset();
+    CHECK(client_filter_should_show(f, reply, me)); // unknown stays visible
+
+    post->reply_to_author_followed = false;
+    post->reply_to_author_id = me;
+    CHECK(client_filter_should_show(f, reply, me)); // new option does not hide replies to me
+
+    post->reply_to_author_id = post->account.id;
+    CHECK(client_filter_should_show(f, reply, me)); // new option does not hide self-replies
+
+    f = ClientFilter{};
+    f.replies_to_unfollowed = false;
+    post->platform = Platform::Mastodon;
+    post->in_reply_to_account_id = "someone";
+    post->reply_to_author_id.reset();
+    post->reply_to_author_followed = false;
+    CHECK(client_filter_should_show(f, reply, me)); // Bluesky only
+}
+
 void test_client_filter_text() {
     const std::string me = "me";
     Status s;

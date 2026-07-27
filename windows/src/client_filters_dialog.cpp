@@ -28,6 +28,7 @@ INT_PTR CALLBACK ClientFilterProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         set_check(dlg, IDC_CF_ORIGINAL, v->original);
         set_check(dlg, IDC_CF_REPLIES, v->replies);
         set_check(dlg, IDC_CF_REPLIES_ME, v->replies_to_me);
+        set_check(dlg, IDC_CF_REPLIES_UNFOLLOWED, v->replies_to_unfollowed);
         set_check(dlg, IDC_CF_THREADS, v->threads);
         set_check(dlg, IDC_CF_BOOSTS, v->boosts);
         set_check(dlg, IDC_CF_QUOTES, v->quotes);
@@ -45,6 +46,7 @@ INT_PTR CALLBACK ClientFilterProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             v->original = get_check(dlg, IDC_CF_ORIGINAL);
             v->replies = get_check(dlg, IDC_CF_REPLIES);
             v->replies_to_me = get_check(dlg, IDC_CF_REPLIES_ME);
+            v->replies_to_unfollowed = get_check(dlg, IDC_CF_REPLIES_UNFOLLOWED);
             v->threads = get_check(dlg, IDC_CF_THREADS);
             v->boosts = get_check(dlg, IDC_CF_BOOSTS);
             v->quotes = get_check(dlg, IDC_CF_QUOTES);

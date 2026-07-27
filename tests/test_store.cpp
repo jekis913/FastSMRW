@@ -41,6 +41,9 @@ void test_timeline_cache() {
         s.id = "a2";
         s.text = "second";
         s.created_at = 200;
+        s.reply_to_handle = "parent.test";
+        s.reply_to_author_id = "did:plc:parent";
+        s.reply_to_author_followed = false;
         items.push_back(TimelineItem{std::move(s)});
     }
 
@@ -50,6 +53,11 @@ void test_timeline_cache() {
     CHECK_EQ(loaded.items[0].id(), std::string("s:a1"));
     CHECK(loaded.items[1].status() != nullptr);
     CHECK_EQ(loaded.items[1].status()->text, std::string("second"));
+    CHECK_EQ(loaded.items[1].status()->reply_to_handle.value(), std::string("parent.test"));
+    CHECK_EQ(loaded.items[1].status()->reply_to_author_id.value(),
+             std::string("did:plc:parent"));
+    CHECK(loaded.items[1].status()->reply_to_author_followed.has_value());
+    CHECK(!*loaded.items[1].status()->reply_to_author_followed);
     CHECK(loaded.scrollback.has_value()); // cursor round-trips
     CHECK_EQ(loaded.scrollback->value, std::string("a2"));
 

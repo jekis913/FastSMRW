@@ -39,6 +39,12 @@ bool client_filter_should_show(const ClientFilter& f, const TimelineItem& item,
     const bool is_original = !is_boost && !is_reply_to_id;
     const bool is_my_post = !me_id.empty() && author_id == me_id;
     const bool is_my_reply = is_reply_to_id && is_my_post;
+    const bool bluesky_reply_to_me =
+        post.platform == Platform::Bluesky && post.reply_to_author_id.has_value() &&
+        !me_id.empty() && *post.reply_to_author_id == me_id;
+    const bool bluesky_self_reply =
+        post.platform == Platform::Bluesky && post.reply_to_author_id.has_value() &&
+        *post.reply_to_author_id == author_id;
 
     if (is_boost && !f.boosts)
         return false;
@@ -49,6 +55,11 @@ bool client_filter_should_show(const ClientFilter& f, const TimelineItem& item,
     if (is_reply && !f.replies)
         return false;
     if (is_reply_to_me && !f.replies_to_me)
+        return false;
+    if (post.platform == Platform::Bluesky && is_reply && !is_reply_to_me &&
+        !bluesky_reply_to_me && !bluesky_self_reply &&
+        !f.replies_to_unfollowed && post.reply_to_author_followed.has_value() &&
+        !*post.reply_to_author_followed)
         return false;
     if (is_original && !f.original)
         return false;

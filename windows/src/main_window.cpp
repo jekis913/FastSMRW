@@ -2685,6 +2685,7 @@ void MainWindow::ev_client_filter(const json& e) {
     v.original = f.value("original", true);
     v.replies = f.value("replies", true);
     v.replies_to_me = f.value("replies_to_me", true);
+    v.replies_to_unfollowed = f.value("replies_to_unfollowed", true);
     v.threads = f.value("threads", true);
     v.boosts = f.value("boosts", true);
     v.quotes = f.value("quotes", true);
@@ -2697,6 +2698,7 @@ void MainWindow::ev_client_filter(const json& e) {
     case ClientFilterAction::Apply: {
         json nf = {{"original", v.original},         {"replies", v.replies},
                    {"replies_to_me", v.replies_to_me}, {"threads", v.threads},
+                   {"replies_to_unfollowed", v.replies_to_unfollowed},
                    {"boosts", v.boosts},             {"quotes", v.quotes},
                    {"media", v.media},               {"no_media", v.no_media},
                    {"my_posts", v.my_posts},         {"my_replies", v.my_replies},

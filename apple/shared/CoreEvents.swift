@@ -347,6 +347,7 @@ struct ClientFilter: Decodable {
     var original = true
     var replies = true
     var repliesToMe = true
+    var repliesToUnfollowed = true
     var threads = true
     var boosts = true
     var quotes = true
@@ -359,6 +360,7 @@ struct ClientFilter: Decodable {
     enum CodingKeys: String, CodingKey {
         case original, replies, threads, boosts, quotes, media, text
         case repliesToMe = "replies_to_me"
+        case repliesToUnfollowed = "replies_to_unfollowed"
         case noMedia = "no_media"
         case myPosts = "my_posts"
         case myReplies = "my_replies"

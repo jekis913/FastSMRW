@@ -16,6 +16,7 @@ struct ClientFilter {
     bool original = true;      // original posts (not replies, not boosts)
     bool replies = true;       // replies to other people
     bool replies_to_me = true; // replies to the current user
+    bool replies_to_unfollowed = true; // Bluesky replies to people not followed
     bool threads = true;       // self-replies (thread continuations)
     bool boosts = true;        // boosts / reposts
     bool quotes = true;        // quote posts
@@ -27,8 +28,8 @@ struct ClientFilter {
 
     // Whether the filter would hide anything (else it can be dropped entirely).
     bool is_active() const {
-        return !(original && replies && replies_to_me && threads && boosts && quotes && media &&
-                 no_media && my_posts && my_replies && text.empty());
+        return !(original && replies && replies_to_me && replies_to_unfollowed && threads &&
+                 boosts && quotes && media && no_media && my_posts && my_replies && text.empty());
     }
 };
 

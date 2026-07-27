@@ -2604,6 +2604,7 @@ void MainWindow::ev_client_filter(const json& e) {
     const std::vector<std::pair<std::string, std::string>> kinds = {
         {"original", "_Original posts"},   {"replies", "_Replies"},
         {"replies_to_me", "Replies to _me"}, {"threads", "_Threads"},
+        {"replies_to_unfollowed", "Bluesky replies to people you don't _follow"},
         {"boosts", "_Boosts"},             {"quotes", "_Quotes"},
         {"media", "Posts with me_dia"},    {"no_media", "Posts _without media"},
         {"my_posts", "M_y posts"},         {"my_replies", "My repl_ies"}};

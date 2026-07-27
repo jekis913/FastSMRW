@@ -32,6 +32,13 @@ static const char* kFeedItem = R"JSON({
     "$type": "app.bsky.feed.defs#reasonRepost",
     "by": { "did": "did:plc:carol", "handle": "carol.bsky.social", "displayName": "Carol" },
     "indexedAt": "2024-06-28T12:30:00.000Z"
+  },
+  "reply": {
+    "parent": {
+      "author": {
+        "did": "did:plc:other", "handle": "other.bsky.social", "viewer": {}
+      }
+    }
   }
 })JSON";
 
@@ -55,9 +62,25 @@ void test_bluesky_feed_mapping() {
     CHECK(inner.like_uri.has_value());
     CHECK_EQ(inner.like_uri.value(), std::string("at://did:plc:me/app.bsky.feed.like/like1"));
     CHECK(inner.in_reply_to_id.has_value());
+    CHECK(!inner.in_reply_to_account_id.has_value());
+    CHECK_EQ(inner.reply_to_author_id.value(), std::string("did:plc:other"));
+    CHECK_EQ(inner.reply_to_handle.value(), std::string("other.bsky.social"));
+    CHECK(inner.reply_to_author_followed.has_value());
+    CHECK(!*inner.reply_to_author_followed);
     CHECK_EQ(inner.media_attachments.size(), size_t(1));
     CHECK(inner.media_attachments[0].type == MediaAttachment::Kind::Image);
     CHECK_EQ(inner.media_attachments[0].description, std::string("a view"));
+
+    json followed_item = json::parse(kFeedItem);
+    followed_item["reply"]["parent"]["author"]["viewer"]["following"] =
+        "at://did:plc:me/app.bsky.graph.follow/f1";
+    const Status followed = bluesky::map_feed_item(followed_item);
+    CHECK(followed.display_status().reply_to_author_followed.value_or(false));
+
+    json unknown_item = json::parse(kFeedItem);
+    unknown_item["reply"]["parent"]["author"].erase("viewer");
+    const Status unknown = bluesky::map_feed_item(unknown_item);
+    CHECK(!unknown.display_status().reply_to_author_followed.has_value());
 }
 
 void test_bluesky_notification_mapping() {

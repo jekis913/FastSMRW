@@ -36,6 +36,13 @@ struct Status {
     // The replied-to author's handle, when known (Bluesky feeds carry the parent
     // post's author) — spoken by the "Replying to" speech field.
     std::optional<std::string> reply_to_handle;
+    // The replied-to author's DID, when a Bluesky feed embeds the parent post.
+    // Kept separate from in_reply_to_account_id so existing reply categories do
+    // not change merely because Bluesky supplied extra feed-view metadata.
+    std::optional<std::string> reply_to_author_id;
+    // Whether the authenticated Bluesky user follows the replied-to author.
+    // nullopt means the feed did not provide enough viewer data to know.
+    std::optional<bool> reply_to_author_followed;
     std::shared_ptr<Status> reblog; // the boosted status, when this is a boost
     std::shared_ptr<Status> quote;  // the quoted status
     std::vector<MediaAttachment> media_attachments;

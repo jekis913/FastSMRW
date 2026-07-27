@@ -516,8 +516,9 @@ BEGIN
     AUTOCHECKBOX "Posts with&out media", IDC_CF_NO_MEDIA, 10, 70, 110, 10
     AUTOCHECKBOX "&Your posts", IDC_CF_MY_POSTS, 128, 70, 112, 10
     AUTOCHECKBOX "Your r&eplies", IDC_CF_MY_REPLIES, 10, 82, 110, 10
-    LTEXT        "Contains te&xt (post, name or handle):", -1, 10, 100, 230, 9
-    EDITTEXT     IDC_CF_TEXT, 10, 112, 230, 12, ES_AUTOHSCROLL | WS_TABSTOP
+    AUTOCHECKBOX "Bluesky replies to people you don't &follow", IDC_CF_REPLIES_UNFOLLOWED, 10, 94, 230, 10
+    LTEXT        "Contains te&xt (post, name or handle):", -1, 10, 112, 230, 9
+    EDITTEXT     IDC_CF_TEXT, 10, 124, 230, 12, ES_AUTOHSCROLL | WS_TABSTOP
     DEFPUSHBUTTON "&Apply", IDOK, 70, 176, 52, 14
     PUSHBUTTON   "C&lear", IDC_CF_CLEAR, 126, 176, 52, 14
     PUSHBUTTON   "Cancel", IDCANCEL, 182, 176, 52, 14
