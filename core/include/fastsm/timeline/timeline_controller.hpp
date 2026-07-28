@@ -206,8 +206,10 @@ public:
     std::optional<std::string> selected_status_id() const;
     // Move the reading position to the row carrying `status_id`. If that status
     // was fetched but hidden by a filter, use its nearest visible neighbor.
-    // Returns true if the position actually changed.
-    bool restore_marker_position(const std::string& status_id);
+    // "Already there" is a successful restore, NOT a failure: only NotFound
+    // means the marker is outside our window and worth an expensive history walk.
+    enum class MarkerRestore { NotFound, AlreadyThere, Moved };
+    MarkerRestore restore_marker_position(const std::string& status_id);
     // During the initial server-marker lookup, front ends may focus the default
     // edge row simply because the list appeared (not because the user navigated).
     // Treat only that one provisional selection as passive; any move away from

@@ -284,10 +284,15 @@ private:
 
     // Home-position sync (Mastodon markers). sync_enabled_for gates on the
     // setting + a home timeline on an account that supports markers;
-    // schedule_home_marker_save debounces the server write; the lookups resolve
-    // an account / the home controller by account_key after an async hop.
+    // schedule_home_marker_save waits out the idle window before the server
+    // write and commit_home_marker sends a pending one right now (leaving the
+    // timeline, or a refresh that saw the user move); the lookups resolve an
+    // account / the home controller by account_key after an async hop.
     bool sync_enabled_for(const TimelineController* tc) const;
     void schedule_home_marker_save(SocialAccount* account, const std::string& status_id);
+    void commit_home_marker(const std::string& account_key);
+    void commit_home_marker_for(const TimelineController* tc);
+    void flush_home_markers_on_exit();
     SocialAccount* account_by_key(const std::string& key) const;
     TimelineController* home_controller_for(const std::string& key) const;
     void apply_settings();
@@ -376,14 +381,14 @@ private:
     std::unordered_set<TimelineController*> dirty_timelines_;
     bool timeline_flush_pending_ = false;
 
-    // Home-position marker-save debounce (see schedule_home_marker_save).
-    std::string marker_pending_key_;                          // account_key of the pending save
-    std::string marker_pending_id_;                           // status id to push
-    std::unordered_map<std::string, std::string> marker_last_saved_; // key -> last id sent
+    // Home-position marker saves (see schedule_home_marker_save). Per account,
+    // so reading in one account never drops another account's pending position.
+    std::unordered_map<std::string, std::string> marker_pending_;     // key -> id waiting to go up
+    std::unordered_map<std::string, std::string> marker_last_saved_;  // key -> last id sent
+    std::unordered_map<std::string, int> marker_gen_;                 // key -> cancels stale timers
     // A marker that a bounded history walk could not find. Do not repeat the
     // same expensive walk every auto-refresh; a changed server marker may retry.
     std::unordered_map<std::string, std::string> marker_recovery_attempted_;
-    int marker_gen_ = 0;                                      // cancels superseded saves
     // Include each post's links ({title,url}) in its row JSON, so a mobile app
     // can offer one action per link. On only when the "expand_links" post
     // action is enabled (link extraction per row isn't free). Set in apply_settings.

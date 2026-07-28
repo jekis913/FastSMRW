@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <fstream>
+#include <future>
 #include <iterator>
 #include <optional>
 #include <set>
@@ -334,7 +335,33 @@ CoreSession::~CoreSession() {
     auto_refresh_running_.store(false);
     if (auto_refresh_thread_.joinable())
         auto_refresh_thread_.join();
+    flush_home_markers_on_exit();
     streams_.clear(); // join all streaming threads while http_/loop_ are still alive
+}
+
+// Quitting counts as leaving the timeline: a reading position still waiting on
+// the idle timer goes up now, so the next session (or another client) resumes
+// where you actually stopped. Runs on the core loop and blocks until it's sent,
+// which is why the write is synchronous here rather than posted to worker_
+// (worker_ is torn down before loop_, so a posted task could outlive it).
+void CoreSession::flush_home_markers_on_exit() {
+    if (marker_pending_.empty())
+        return;
+    std::promise<void> done;
+    std::future<void> sent = done.get_future();
+    loop_.post([this, &done] {
+        for (const auto& [key, id] : marker_pending_) {
+            if (id.empty() || marker_last_saved_[key] == id)
+                continue;
+            if (SocialAccount* account = account_by_key(key)) {
+                marker_last_saved_[key] = id;
+                account->set_home_marker(id);
+            }
+        }
+        marker_pending_.clear();
+        done.set_value();
+    });
+    sent.wait();
 }
 
 void CoreSession::dispatch(const std::string& command_json) {
@@ -715,6 +742,7 @@ void CoreSession::cmd_select_account(const json& cmd) {
     const int n = static_cast<int>(accts.size());
     const std::string dir = cmd.value("dir", std::string{});
     const int target = dir == "prev" ? (idx - 1 + n) % n : (idx + 1) % n;
+    commit_home_marker_for(current()); // leaving this account's timeline
     switch_account(accts[static_cast<size_t>(target)]->account_key()); // swap, don't rebuild
     sound_.play(sound::Earcon::Navigate);
     emit_accounts();
@@ -783,6 +811,7 @@ void CoreSession::cmd_select_timeline(const json& cmd) {
     }
     if (target < 0 || target >= n || target == current_)
         return;
+    commit_home_marker_for(current()); // leaving a timeline publishes its position now
     current_ = target;
     emit_timelines();
     if (TimelineController* tc = current()) {
@@ -889,31 +918,55 @@ bool CoreSession::sync_enabled_for(const TimelineController* tc) const {
            tc->account()->supports_position_sync();
 }
 
-// Debounced marker save: coalesce a burst of cursor moves into one server write
-// ~2s after the user settles, so arrowing through the timeline isn't one POST
-// per row. A generation counter cancels superseded saves.
+// Home-position push. Reading is a burst of cursor moves, so the position isn't
+// sent per row: it's held until the user has been still in this timeline for
+// kMarkerIdleSaveMs, and committed right away when they leave the timeline or a
+// refresh finds they've moved (see commit_home_marker). A per-account generation
+// counter cancels timers superseded by a newer selection or by a commit.
+static constexpr int kMarkerIdleSaveMs = 30000;
+
 void CoreSession::schedule_home_marker_save(SocialAccount* account, const std::string& status_id) {
     if (!account || status_id.empty())
         return;
     const std::string key = account->account_key();
-    if (marker_last_saved_[key] == status_id)
+    if (marker_last_saved_[key] == status_id) {
+        marker_pending_.erase(key); // the server already has this position
         return;
-    marker_pending_key_ = key;
-    marker_pending_id_ = status_id;
-    const int gen = ++marker_gen_;
-    loop_.post_delayed(std::chrono::milliseconds(2000), [this, gen] {
-        if (gen != marker_gen_)
-            return; // a newer selection superseded this one
-        const std::string key = marker_pending_key_;
-        const std::string id = marker_pending_id_;
-        if (id.empty() || marker_last_saved_[key] == id)
-            return;
-        SocialAccount* account = account_by_key(key);
-        if (!account)
-            return; // the account was removed while pending
-        marker_last_saved_[key] = id;
-        worker_.post([account, id] { account->set_home_marker(id); });
+    }
+    marker_pending_[key] = status_id;
+    const int gen = ++marker_gen_[key];
+    loop_.post_delayed(std::chrono::milliseconds(kMarkerIdleSaveMs), [this, key, gen] {
+        if (gen != marker_gen_[key])
+            return; // a newer selection (or a commit) superseded this one
+        commit_home_marker(key);
     });
+}
+
+// Send this account's pending position now. Safe to call when nothing is
+// pending; bumps the generation so the idle timer doesn't send it a second time.
+void CoreSession::commit_home_marker(const std::string& key) {
+    auto pending = marker_pending_.find(key);
+    if (pending == marker_pending_.end())
+        return;
+    const std::string id = pending->second;
+    marker_pending_.erase(pending);
+    ++marker_gen_[key];
+    if (id.empty() || marker_last_saved_[key] == id)
+        return;
+    SocialAccount* account = account_by_key(key);
+    if (!account)
+        return; // the account was removed while pending
+    marker_last_saved_[key] = id;
+    // On the interactive queue, not worker_: it goes out now instead of behind a
+    // slow refresh, and it shares a queue with the marker *reads*, so a pull can
+    // never overtake a push and hand us back the position we just replaced.
+    action_worker_.post([account, id] { account->set_home_marker(id); });
+}
+
+// "I moved away from that timeline" -- commit whatever position it was holding.
+void CoreSession::commit_home_marker_for(const TimelineController* tc) {
+    if (sync_enabled_for(tc))
+        commit_home_marker(tc->account()->account_key());
 }
 
 SocialAccount* CoreSession::account_by_key(const std::string& key) const {
@@ -2447,6 +2500,7 @@ void CoreSession::cmd_close_timeline() {
     // A pinned tab is locked; only inherently-dismissable, un-pinned tabs close.
     if (!tc || !tc->source().is_dismissable() || tc->pinned())
         return;
+    commit_home_marker_for(tc); // leaving for good -- publish its position first
     const std::string origin = tc->origin_key();
     const std::string closed_key = tc->cache_key();
     const int closed_index = current_;
@@ -3884,6 +3938,11 @@ std::unique_ptr<TimelineController> CoreSession::make_controller(SocialAccount* 
         const bool moved = p->user_moved_position();
         p->reset_user_moved();
         if (moved) {
+            // Commit our position instead of pulling. This must happen before any
+            // later pull can run: while a position sat waiting for the idle timer,
+            // a refresh landing in that window would read the older server value
+            // and yank the user back to it.
+            commit_home_marker(p->account()->account_key());
             p->finish_marker_restore();
             return;
         }
@@ -3911,10 +3970,29 @@ std::unique_ptr<TimelineController> CoreSession::make_controller(SocialAccount* 
                     home->finish_marker_restore();
                     return;
                 }
-                if (home->restore_marker_position(*marker)) {
+                // Did this position come from us? (Checked before the line below
+                // makes it our last-known value.)
+                const bool ours = marker_last_saved_[key] == *marker;
+                // This IS the server's position now, so don't push it straight back
+                // when the front end echoes the selection we're about to make.
+                marker_last_saved_[key] = *marker;
+                using MarkerRestore = TimelineController::MarkerRestore;
+                const MarkerRestore restored = home->restore_marker_position(*marker);
+                if (restored != MarkerRestore::NotFound) {
+                    // Found it -- including the common case where it's the row we're
+                    // already on. Sitting on the synced position is a no-op, not a
+                    // reason to go looking for the marker in older history.
                     marker_recovery_attempted_.erase(key);
                     home->finish_marker_restore();
-                    emit_select_row(home, home->selected_id());
+                    if (restored == MarkerRestore::Moved)
+                        emit_select_row(home, home->selected_id());
+                    return;
+                }
+                // Nothing to fetch if the server position is the one we published
+                // ourselves: we've been there, the row has just aged out of our
+                // window, and walking history back to it would change nothing.
+                if (ours) {
+                    home->finish_marker_restore();
                     return;
                 }
                 // The marker fell beyond this client's cache/refresh window.
@@ -3937,8 +4015,11 @@ std::unique_ptr<TimelineController> CoreSession::make_controller(SocialAccount* 
                         restored->finish_marker_restore();
                         if (!found || user_moved || !sync_enabled_for(restored))
                             return;
-                        marker_recovery_attempted_.erase(key);
-                        if (restored->restore_marker_position(marker))
+                        // Keep the attempt recorded even on success: the walk is
+                        // expensive and this marker is now handled. A different
+                        // server marker still gets its own attempt.
+                        if (restored->restore_marker_position(marker) ==
+                            TimelineController::MarkerRestore::Moved)
                             emit_select_row(restored, restored->selected_id());
                     });
             });

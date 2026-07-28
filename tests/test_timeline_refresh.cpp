@@ -239,3 +239,36 @@ void test_marker_restore_ignores_only_provisional_edge_focus() {
     tc.note_selection(tc.items()[1].id());
     CHECK_EQ(moves, 1);
 }
+
+// Restoring the synced position has three outcomes, and the session acts very
+// differently on each: only "not in our window" may trigger the expensive walk
+// back through history. Reporting "already on that row" as a failure is what made
+// an idle client re-walk its whole timeline on every refresh.
+void test_marker_restore_reports_already_there() {
+    using MarkerRestore = TimelineController::MarkerRestore;
+    TimelineSource src;
+    src.kind = TimelineSource::Kind::PostUsers; // static: no I/O
+    TimelineController tc(nullptr, src, nullptr, nullptr, nullptr, 40);
+    for (const char* id : {"c", "b", "a"}) // prepend order -> a, b, c
+        tc.ingest_realtime(mkitem(id));
+
+    // Sitting somewhere else: the position moves to the marker.
+    tc.note_selection("s:a");
+    CHECK(tc.restore_marker_position("c") == MarkerRestore::Moved);
+    CHECK_EQ(tc.selected_id(), std::string("s:c"));
+
+    // Sitting ON the marker: a no-op success, not a miss.
+    CHECK(tc.restore_marker_position("c") == MarkerRestore::AlreadyThere);
+    CHECK_EQ(tc.selected_id(), std::string("s:c"));
+
+    // Genuinely absent: the one case worth fetching history for.
+    CHECK(tc.restore_marker_position("gone") == MarkerRestore::NotFound);
+    CHECK_EQ(tc.selected_id(), std::string("s:c"));
+
+    // Present but filtered out: anchor to a neighbor ("a", the nearest visible row
+    // to "b"), and never ask for a walk — more history can't unhide a filtered row.
+    tc.note_selection("s:c");
+    tc.set_filter([](const TimelineItem& it) { return it.id() != "s:b"; });
+    CHECK(tc.restore_marker_position("b") == MarkerRestore::Moved);
+    CHECK(tc.restore_marker_position("b") == MarkerRestore::AlreadyThere);
+}

@@ -18,6 +18,8 @@ FastSMRW changelog
 - New: open the built-in user guide from inside the app — press F1 on Windows and Mac, or choose Help in the More menu on iPhone and Android.
 - Fixed: home position sync now saves your spot no matter how you move through the timeline (including the invisible interface), and no longer tugs you around while you're actively reading.
 - Fixed: home position sync now catches up when you return to a backgrounded app, and can find your last-read post even when it is older than this device's saved timeline.
+- Fixed: home position sync no longer re-downloads your timeline over and over while you sit on your synced spot, and no longer snaps you back to an older position moments after you move.
+- Changed: home position sync now sends your spot when you leave the home timeline (or quit) and after about thirty seconds of not moving, instead of after every couple of seconds.
 - Fixed: the Mac and iPhone settings now make it clear that "Off" disables emoji removal rather than hiding emoji.
 
 0.5.2

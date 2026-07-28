@@ -649,16 +649,17 @@ std::optional<std::string> TimelineController::selected_status_id() const {
     return std::nullopt;
 }
 
-bool TimelineController::restore_marker_position(const std::string& status_id) {
+TimelineController::MarkerRestore
+TimelineController::restore_marker_position(const std::string& status_id) {
     if (status_id.empty())
-        return false;
+        return MarkerRestore::NotFound;
     for (const auto& it : visible_) {
         const Status* s = it.status();
         if (s && s->id == status_id) {
             if (selected_id_ == it.id())
-                return false; // already there
+                return MarkerRestore::AlreadyThere;
             selected_id_ = it.id();
-            return true;
+            return MarkerRestore::Moved;
         }
     }
 
@@ -670,7 +671,7 @@ bool TimelineController::restore_marker_position(const std::string& status_id) {
         return status && status->id == status_id;
     });
     if (marker == raw_.end())
-        return false;
+        return MarkerRestore::NotFound;
     const size_t marker_index = static_cast<size_t>(marker - raw_.begin());
     for (size_t distance = 1; distance < raw_.size(); ++distance) {
         const size_t newer = marker_index >= distance ? marker_index - distance : raw_.size();
@@ -682,12 +683,14 @@ bool TimelineController::restore_marker_position(const std::string& status_id) {
             if (visible_index_of(id) < 0)
                 continue;
             if (selected_id_ == id)
-                return false;
+                return MarkerRestore::AlreadyThere;
             selected_id_ = id;
-            return true;
+            return MarkerRestore::Moved;
         }
     }
-    return false;
+    // The marker is in our window but nothing around it is visible (everything
+    // filtered out) -- a history walk wouldn't help, so don't ask for one.
+    return MarkerRestore::AlreadyThere;
 }
 
 void TimelineController::load_older(bool automatic) {
