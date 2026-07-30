@@ -278,6 +278,9 @@ final class AppState {
     /// this starts a fresh Home-marker sync window so another client's position
     /// can be adopted.
     func resume() { client.send("resume") }
+    /// The app is going to the background: publish any reading position still
+    /// waiting on its idle timer, since we may be suspended before it fires.
+    func pause() { client.send("pause") }
 
     // Settings: mutate the full object and echo it back so the core keeps every
     // field (it re-applies defaults for anything missing).

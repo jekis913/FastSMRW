@@ -20,6 +20,11 @@ FastSMRW changelog
 - Fixed: home position sync now catches up when you return to a backgrounded app, and can find your last-read post even when it is older than this device's saved timeline.
 - Fixed: home position sync no longer re-downloads your timeline over and over while you sit on your synced spot, and no longer snaps you back to an older position moments after you move.
 - Changed: home position sync now sends your spot when you leave the home timeline (or quit) and after about thirty seconds of not moving, instead of after every couple of seconds.
+- Fixed: on iPhone and Android, your place in the timeline stays put — it no longer bounces around or throws you to the top when new posts arrive or a refresh lands.
+- Fixed: home position sync no longer mistakes a device that is just sitting there for one you are reading on, so an idle device follows the one you are actually using again.
+- Fixed: on a phone, home position sync now sends the spot you reached just before you switched away from the app, instead of losing it.
+- Fixed: on iPhone, the "Return key sends the post" setting works — with it on Return sends and Shift+Return starts a new line; with it off Return starts a new line and Command+Return sends.
+- New: on Android, choose whether the Return key sends a post, under Settings, General.
 - Fixed: the Mac and iPhone settings now make it clear that "Off" disables emoji removal rather than hiding emoji.
 
 0.5.2

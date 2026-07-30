@@ -27,6 +27,12 @@ int TimelineController::visible_index_of(const std::string& id) const {
 }
 
 void TimelineController::note_selection(const std::string& id) {
+    // Re-reporting the row we're already on is not a move. Front ends echo the
+    // current row for all sorts of reasons — a list re-selecting after a reload, a
+    // scroll settling, adopting a position the core just restored — and counting
+    // those as movement made an idle client look busy, so it stopped following the
+    // synced home position and republished its own instead.
+    const bool same_row = (id == selected_id_);
     // Record a "jump" (move of more than one visible row, or to/from an item not
     // in the list) so Go Back can return here; single-row steps aren't recorded.
     if (!selected_id_.empty() && selected_id_ != id) {
@@ -41,6 +47,8 @@ void TimelineController::note_selection(const std::string& id) {
         }
     }
     selected_id_ = id;
+    if (same_row)
+        return;
     // iOS/VoiceOver (and some desktop list controls) focus the default edge row
     // as soon as a newly-populated list appears. While the first server-marker
     // restore is pending, that focus echo is provisional rather than evidence

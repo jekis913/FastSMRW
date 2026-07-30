@@ -150,6 +150,7 @@ limit). You can:
 Open Settings from the overflow menu. It is organized into sections that mirror
 the other versions of FastSM:
 
+- General — whether the Return key sends the post.
 - Timelines — cache size, auto-refresh interval, real-time streaming (Mastodon),
   tab-bar position, showing mentions in Notifications, reversing timelines,
   auto-loading older posts, and syncing your Home reading position (Mastodon).

@@ -181,6 +181,8 @@ data class ComposeContext(
     val quotedStatusUrl: String?,
     val editId: String?,
     val participants: List<ComposeParticipant>,
+    /** The "Return key sends the post" setting, resolved by the core. */
+    val enterToSend: Boolean,
 )
 
 /**
@@ -210,9 +212,28 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _rowsByTab = MutableStateFlow<Map<Int, List<RowUi>>>(emptyMap())
     val rowsByTab: StateFlow<Map<Int, List<RowUi>>> = _rowsByTab.asStateFlow()
 
-    // The core's remembered reading position per tab (row id to restore to).
+    // The core's remembered reading position per tab (row id to restore to when a
+    // tab is first shown). It follows the position we report, so it must NOT be
+    // used to scroll on every timeline update — that snapped the list under the
+    // reader after each refresh and each streamed-in post.
     private val _selectedIdByTab = MutableStateFlow<Map<Int, String>>(emptyMap())
     val selectedIdByTab: StateFlow<Map<Int, String>> = _selectedIdByTab.asStateFlow()
+
+    /**
+     * A one-shot "move to this row" from the core (a marker restore, Go Back, jump
+     * to a reply's parent, a find hit). The serial makes repeats distinct so the
+     * list scrolls once per request and never on its own data changes.
+     */
+    data class ScrollRequest(val tab: Int, val id: String, val serial: Long)
+
+    private var scrollSerial = 0L
+    private val _scrollRequest = MutableStateFlow<ScrollRequest?>(null)
+    val scrollRequest: StateFlow<ScrollRequest?> = _scrollRequest.asStateFlow()
+
+    private fun requestScroll(tab: Int, id: String) {
+        if (id.isBlank()) return
+        _scrollRequest.value = ScrollRequest(tab, id, ++scrollSerial)
+    }
 
     private val _authResults = MutableSharedFlow<AuthResult>(
         extraBufferCapacity = 4,
@@ -562,13 +583,14 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
             "copy_to_clipboard" -> _copyText.tryEmit(e.optString("text"))
             "open_url" -> _openUrls.tryEmit(e.optString("url"))
 
-            // Core asks us to move to a row (e.g. jump to a reply's parent): update
-            // the current tab's selected id so the list scrolls there.
+            // Core asks us to move to a row (e.g. jump to a reply's parent, or the
+            // synced home position): scroll there once.
             "select_row" -> {
                 val id = e.optString("id")
                 if (id.isNotBlank()) {
                     val idx = _currentTab.value
                     _selectedIdByTab.update { it + (idx to id) }
+                    requestScroll(idx, id)
                 }
             }
 
@@ -634,6 +656,12 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshAll() = core.dispatch("refresh_all")
 
     fun resume() = core.dispatch("resume")
+
+    /**
+     * Going to the background: publish any reading position still waiting on its
+     * idle timer, since Android can kill the process before it fires.
+     */
+    fun pause() = core.dispatch("pause")
 
     /** Open a post's conversation as a new tab. */
     fun openThread(id: String) = core.dispatch("open_thread") { put("id", id) }
@@ -807,7 +835,8 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
         for (offset in 0 until n) {
             val i = ((start + direction * offset) % n + n) % n
             if (rows[i].text.lowercase().contains(needle)) {
-                _selectedIdByTab.update { it + (tab to rows[i].id) } // scroll there
+                _selectedIdByTab.update { it + (tab to rows[i].id) }
+                requestScroll(tab, rows[i].id)                       // move the list there
                 noteSelection(rows[i].id)                            // persist to the core
                 _announcements.tryEmit(rows[i].text)                 // speak the match
                 return
@@ -1107,6 +1136,7 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
             quotedStatusUrl = nullable("quoted_status_url"),
             editId = nullable("edit_id"),
             participants = participants,
+            enterToSend = e.optBoolean("enter_to_send"),
         )
     }
 

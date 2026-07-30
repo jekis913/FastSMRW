@@ -128,10 +128,14 @@ final class ComposeViewController: StaticFormViewController {
         textView.isScrollEnabled = false
         textView.accessibilityLabel = "Post text"
         textView.delegate = self
-        // VoiceOver Braille Screen Input's "send" gesture (three-finger swipe up)
-        // and a hardware Return both fire the Return *key action* — catch it and
-        // post. The on-screen keyboard's Return still inserts a newline.
-        textView.onReturnKey = { [weak self] in self?.postTapped() }
+        // "Return key sends the post" (the enter_to_send setting, resolved by the
+        // core). With it on, Return sends everywhere — the on-screen keyboard, a
+        // hardware Return, and VoiceOver Braille Screen Input's "send" gesture
+        // (three-finger swipe up, which fires the Return key action) — and
+        // Shift+Return starts a new line. With it off, Return always starts a new
+        // line and Command+Return sends, matching the Mac.
+        textView.enterToSend = context.enterToSend ?? false
+        textView.onSend = { [weak self] in self?.postTapped() }
         if let prefill = context.prefillText { textView.text = prefill }
         textView.translatesAutoresizingMaskIntoConstraints = false
         textCell.contentView.addSubview(textView)
@@ -509,23 +513,43 @@ final class ComposeViewController: StaticFormViewController {
 
 // MARK: - Text view
 
-/// A UITextView that routes the Return/Enter *key action* to a closure. That key
-/// action is what VoiceOver Braille Screen Input's "send" gesture (three-finger
-/// swipe up) and a hardware Return produce; the on-screen keyboard's Return and
-/// the two-finger BSI "new line" gesture insert a literal "\n" instead and are
-/// left untouched, so multi-line posts still work.
+/// A UITextView that sends the post from the Return key when `enterToSend` is on.
+/// Return arrives two ways: as a *key action* (a hardware Return, and VoiceOver
+/// Braille Screen Input's "send" gesture — three-finger swipe up), handled here;
+/// and as a literal "\n" from the on-screen keyboard, handled in the text-view
+/// delegate. Command+Return always sends, so there's a send key even with the
+/// setting off.
 final class ComposeUITextView: UITextView {
-    var onReturnKey: (() -> Void)?
+    var enterToSend = false
+    var onSend: (() -> Void)?
     override var keyCommands: [UIKeyCommand]? {
-        let command = UIKeyCommand(input: "\r", modifierFlags: [],
-                                   action: #selector(handleReturnKey))
-        command.wantsPriorityOverSystemBehavior = true
-        return [command]
+        var commands: [UIKeyCommand] = []
+        if enterToSend {
+            let plain = UIKeyCommand(input: "\r", modifierFlags: [],
+                                     action: #selector(handleSend))
+            plain.wantsPriorityOverSystemBehavior = true
+            commands.append(plain)
+        }
+        for modifier in [UIKeyModifierFlags.command, .control] {
+            commands.append(UIKeyCommand(input: "\r", modifierFlags: modifier,
+                                         action: #selector(handleSend)))
+        }
+        return commands
     }
-    @objc private func handleReturnKey() { onReturnKey?() }
+    @objc private func handleSend() { onSend?() }
 }
 
 extension ComposeViewController: UITextViewDelegate {
+    /// The on-screen keyboard's Return: send instead of inserting a newline when
+    /// "Return key sends the post" is on. A pasted multi-line block still goes in
+    /// as typed — only a Return on its own sends.
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange,
+                  replacementText text: String) -> Bool {
+        guard self.textView.enterToSend, text == "\n" else { return true }
+        postTapped()
+        return false
+    }
+
     func textViewDidChange(_ textView: UITextView) {
         updateCounter()
         // Self-sizing cell: re-measure without reloading (reload would drop

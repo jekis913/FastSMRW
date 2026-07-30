@@ -145,6 +145,7 @@ fun SettingsScreen(viewModel: CoreViewModel, onClose: () -> Unit) {
         speechList == "copy_status" -> "Copy: Posts"
         speechList == "copy_user" -> "Copy: Users"
         speechList == "copy_notification" -> "Copy: Notifications"
+        panel == "general" -> "General"
         panel == "timelines" -> "Timelines"
         panel == "audio" -> "Audio"
         panel == "earcons" -> "Earcons"
@@ -180,6 +181,7 @@ fun SettingsScreen(viewModel: CoreViewModel, onClose: () -> Unit) {
         ) {
             when {
                 speechList != null -> SpeechFieldEditor(s, speechList!!, viewModel)
+                panel == "general" -> GeneralPanel(s, viewModel)
                 panel == "timelines" -> TimelinesPanel(s, viewModel)
                 panel == "audio" -> AudioPanel(s, soundpacks, viewModel)
                 panel == "earcons" -> EarconsPanel(s, viewModel)
@@ -198,6 +200,7 @@ fun SettingsScreen(viewModel: CoreViewModel, onClose: () -> Unit) {
 @Composable
 private fun RootList(onOpen: (String) -> Unit) {
     listOf(
+        "general" to "General",
         "timelines" to "Timelines",
         "audio" to "Audio",
         "earcons" to "Earcons",
@@ -218,6 +221,15 @@ private fun RootList(onOpen: (String) -> Unit) {
         )
         HorizontalDivider()
     }
+}
+
+@Composable
+private fun GeneralPanel(s: JSONObject, vm: CoreViewModel) {
+    SwitchRow("Return key sends the post", s.optBoolean("enter_to_send")) {
+        vm.updateSetting { put("enter_to_send", it) }
+    }
+    HelpText("With this on, Return sends the post and Shift+Return starts a new line. "
+        + "With it off, Return starts a new line and Ctrl+Return sends.")
 }
 
 @Composable

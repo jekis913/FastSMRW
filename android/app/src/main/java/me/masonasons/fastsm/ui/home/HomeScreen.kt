@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -54,7 +55,6 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,6 +88,7 @@ fun HomeScreen(
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val rowsByTab by viewModel.rowsByTab.collectAsStateWithLifecycle()
     val selectedIdByTab by viewModel.selectedIdByTab.collectAsStateWithLifecycle()
+    val scrollRequest by viewModel.scrollRequest.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val tabsAtBottom = settings?.optString("tab_bar_position") == "bottom"
     // Enabled post-action keys, in the user's configured order (drives each
@@ -256,6 +257,12 @@ fun HomeScreen(
                 rows = rowsByTab[pageIndex] ?: emptyList(),
                 isCurrent = pageIndex == pagerState.currentPage,
                 selectedId = selectedIdByTab[pageIndex].orEmpty(),
+                // Which timeline this page is showing. Switching accounts (or closing
+                // a tab) reuses the page for a different timeline, and that page has
+                // to forget its scroll state and restore the new timeline's position.
+                timelineKey = tabs.getOrNull(pageIndex)
+                    ?.let { "$selected/${it.kind}/${it.title}" } ?: "$pageIndex",
+                scrollRequest = scrollRequest?.takeIf { it.tab == pageIndex },
                 actionOrder = postActionOrder,
                 onOpenLink = viewModel::openLink,
                 onLoadOlder = { viewModel.loadOlder(automatic = true) },
@@ -581,6 +588,8 @@ private fun StatusList(
     rows: List<RowUi>,
     isCurrent: Boolean,
     selectedId: String,
+    timelineKey: String,
+    scrollRequest: CoreViewModel.ScrollRequest?,
     actionOrder: List<String>,
     onOpenLink: (String) -> Unit,
     onLoadOlder: () -> Unit,
@@ -614,7 +623,10 @@ private fun StatusList(
         return
     }
 
-    val listState = rememberLazyListState()
+    // Keyed on the timeline: a page reused for a different timeline (account switch,
+    // closed tab) must start from that timeline's own position, not keep this one's
+    // scroll offset.
+    val listState = remember(timelineKey) { LazyListState() }
 
     // Load older posts as the end of the list approaches (visible page only).
     val shouldLoadOlder by remember(rows.size, isCurrent) {
@@ -629,24 +641,44 @@ private fun StatusList(
         snapshotFlow { shouldLoadOlder }.distinctUntilChanged().collect { if (it) onLoadOlder() }
     }
 
-    // Restore the core's remembered position once per distinct selected_id.
-    var restoredFor by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(selectedId, rows) {
-        if (selectedId.isBlank() || selectedId == restoredFor) return@LaunchedEffect
+    // The rows as they are *now*. The effects below outlive individual updates, so
+    // reading their captured `rows` would report the post that used to be at an
+    // index — a row the reader never chose, and sometimes one that no longer exists.
+    val currentRows = rememberUpdatedState(rows)
+
+    // Restore the position the core remembers, once, when this tab first fills.
+    // Afterwards the core's position follows what we report, so re-applying it on
+    // every timeline update would snap the list under the reader on each refresh.
+    var restored by remember(timelineKey) { mutableStateOf(false) }
+    LaunchedEffect(timelineKey, rows) {
+        if (restored || rows.isEmpty()) return@LaunchedEffect
+        restored = true
         val idx = rows.indexOfFirst { it.id == selectedId }
-        if (idx >= 0) {
-            listState.scrollToItem(idx)
-            restoredFor = selectedId
-        }
+        if (idx > 0) listState.scrollToItem(idx)
     }
 
-    // Report the settled reading position so the core persists it.
+    // Move only when the core asks (a synced-position restore, Go Back, jump to a
+    // reply's parent, a find hit) — one scroll per request.
+    LaunchedEffect(scrollRequest?.serial) {
+        val target = scrollRequest ?: return@LaunchedEffect
+        val idx = currentRows.value.indexOfFirst { it.id == target.id }
+        if (idx >= 0) listState.scrollToItem(idx)
+    }
+
+    // Report the reading position once a scroll settles. Reporting on every
+    // first-visible-index change also fired when the list re-anchored after a
+    // refresh, handing the core a row the reader never moved to — which, with home
+    // position sync on, then went to the server and dragged every device to it.
     LaunchedEffect(listState, isCurrent) {
         if (!isCurrent) return@LaunchedEffect
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .distinctUntilChanged()
-            .debounce(1000)
-            .collect { idx -> rows.getOrNull(idx)?.let { onNoteSelection(it.id) } }
+        var wasScrolling = false
+        snapshotFlow { listState.isScrollInProgress }.distinctUntilChanged().collect { now ->
+            if (wasScrolling && !now) {
+                currentRows.value.getOrNull(listState.firstVisibleItemIndex)
+                    ?.let { onNoteSelection(it.id) }
+            }
+            wasScrolling = now
+        }
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
@@ -654,6 +686,7 @@ private fun StatusList(
             StatusRow(
                 row = row,
                 actionOrder = actionOrder,
+                onSelect = onNoteSelection,
                 onOpenLink = onOpenLink,
                 onOpenThread = onOpenThread,
                 onOpenAuthor = onOpenAuthor,

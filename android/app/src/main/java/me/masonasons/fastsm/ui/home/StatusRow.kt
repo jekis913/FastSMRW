@@ -48,6 +48,8 @@ private val DEFAULT_POST_ACTION_ORDER = listOf(
 fun StatusRow(
     row: RowUi,
     actionOrder: List<String>,
+    /** Acting on a row makes it the reading position (the core persists it). */
+    onSelect: (String) -> Unit,
     onOpenLink: (String) -> Unit,
     onOpenThread: (String) -> Unit,
     onOpenAuthor: (String) -> Unit,
@@ -136,13 +138,13 @@ fun StatusRow(
 
     val base = Modifier
         .combinedClickable(
-            onClick = { primaryOpen() },
-            onLongClick = { menuOpen = true },
+            onClick = { onSelect(row.id); primaryOpen() },
+            onLongClick = { onSelect(row.id); menuOpen = true },
         )
         .clearAndSetSemantics {
             contentDescription = row.text
             customActions = actions
-            onClick { primaryOpen(); true }
+            onClick { onSelect(row.id); primaryOpen(); true }
         }
         .padding(horizontal = 16.dp, vertical = 12.dp)
 

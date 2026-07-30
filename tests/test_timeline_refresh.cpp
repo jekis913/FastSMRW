@@ -272,3 +272,30 @@ void test_marker_restore_reports_already_there() {
     CHECK(tc.restore_marker_position("b") == MarkerRestore::Moved);
     CHECK(tc.restore_marker_position("b") == MarkerRestore::AlreadyThere);
 }
+
+// Front ends re-report the current row constantly (a list re-selecting after a
+// reload, a phone's scroll settling, adopting the position the core just
+// restored). None of that is the user moving: counting it as movement made an
+// idle client stop following the synced home position.
+void test_note_selection_same_row_is_not_a_move() {
+    TimelineSource src;
+    src.kind = TimelineSource::Kind::PostUsers; // static: no I/O
+    TimelineController tc(nullptr, src, nullptr, nullptr, nullptr, 40);
+    for (const char* id : {"c", "b", "a"}) // prepend order -> a, b, c
+        tc.ingest_realtime(mkitem(id));
+
+    int moves = 0;
+    tc.on_user_moved = [&] { ++moves; };
+    tc.note_selection("s:b");
+    CHECK_EQ(moves, 1);
+    tc.note_selection("s:b"); // the same row again: an echo, not a move
+    CHECK_EQ(moves, 1);
+
+    // A position the core restored, then echoed back by the front end.
+    CHECK(tc.restore_marker_position("c") == TimelineController::MarkerRestore::Moved);
+    tc.note_selection("s:c");
+    CHECK_EQ(moves, 1);
+
+    tc.note_selection("s:a"); // a real move still counts
+    CHECK_EQ(moves, 2);
+}

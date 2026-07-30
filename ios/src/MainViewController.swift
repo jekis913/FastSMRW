@@ -420,6 +420,7 @@ final class MainViewController: UIViewController {
         // Structural changes (posts streamed in, gaps filled, deletions).
         let diff = new.map(\.id).difference(from: old.map(\.id))
         if !diff.isEmpty {
+            let anchor = captureScrollAnchor(in: old)
             tableView.performBatchUpdates {
                 for change in diff {
                     switch change {
@@ -432,6 +433,7 @@ final class MainViewController: UIViewController {
                     }
                 }
             }
+            restoreScrollAnchor(anchor, in: new)
         }
 
         // Content-only changes (timestamps, counts, boost/favorite state):
@@ -449,8 +451,50 @@ final class MainViewController: UIViewController {
             }
         }
         if heightsChanged {
+            // A row above the one being read can change height (a timestamp growing
+            // from "1m" to "10m" rewraps), which would slide everything below it.
+            let anchor = captureScrollAnchor(in: new)
             tableView.performBatchUpdates {} // re-measure heights without reloading
+            restoreScrollAnchor(anchor, in: new)
         }
+    }
+
+    /// A row plus where it sits on screen, so an update that inserts or removes rows
+    /// above it can put it back exactly there.
+    private struct ScrollAnchor {
+        let id: String
+        let offset: CGFloat
+    }
+
+    /// Inserting rows above the visible area doesn't move the table's scroll
+    /// position, so the posts being read slide down the screen and the list drifts
+    /// toward the newest post — with a streaming timeline that reads as jumping to
+    /// the top on its own. Remember the row being read (or the topmost visible one)
+    /// before the update so it can be pinned afterwards. Nothing is captured while a
+    /// scroll gesture is live: never fight the user's finger.
+    private func captureScrollAnchor(in current: [Row]) -> ScrollAnchor? {
+        guard !tableView.isDragging, !tableView.isDecelerating else { return nil }
+        let visible = tableView.indexPathsForVisibleRows ?? []
+        guard !visible.isEmpty else { return nil }
+        let tracked = selectionByKey[currentKey]
+            .flatMap { id in current.firstIndex(where: { $0.id == id }) }
+            .map { IndexPath(row: $0, section: 0) }
+        let path = tracked.flatMap { visible.contains($0) ? $0 : nil } ?? visible[0]
+        guard current.indices.contains(path.row) else { return nil }
+        return ScrollAnchor(id: current[path.row].id,
+                            offset: tableView.rectForRow(at: path).minY
+                                - tableView.contentOffset.y)
+    }
+
+    private func restoreScrollAnchor(_ anchor: ScrollAnchor?, in current: [Row]) {
+        guard let anchor, let index = current.firstIndex(where: { $0.id == anchor.id })
+        else { return }
+        tableView.layoutIfNeeded()
+        let rect = tableView.rectForRow(at: IndexPath(row: index, section: 0))
+        let minY = -tableView.adjustedContentInset.top
+        let maxY = max(minY, tableView.contentSize.height
+            + tableView.adjustedContentInset.bottom - tableView.bounds.height)
+        tableView.contentOffset.y = min(max(rect.minY - anchor.offset, minY), maxY)
     }
 
     private func scrollTo(_ index: Int) {

@@ -49,6 +49,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -235,12 +242,41 @@ fun ComposeScreen(
 
             OutlinedTextField(
                 value = field,
-                onValueChange = { field = it },
+                // "Return key sends the post": the on-screen keyboard's Return arrives
+                // as a newline in the text, so catch it here instead of letting it into
+                // the post. Only a single typed newline counts — pasted multi-line text
+                // still goes in as-is.
+                onValueChange = { new ->
+                    val typedReturn = ctx.enterToSend &&
+                        new.text.length == field.text.length + 1 &&
+                        new.text.count { it == '\n' } == field.text.count { it == '\n' } + 1
+                    if (typedReturn) {
+                        if (!sending && canSend) send()
+                    } else {
+                        field = new
+                    }
+                },
                 label = { Text("What's on your mind?") },
                 enabled = !sending,
                 minLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                modifier = Modifier.fillMaxWidth(),
+                // Hardware keyboards, matching the desktop apps: when Return sends,
+                // Shift+Return and Ctrl+Return insert a newline; when it doesn't,
+                // Ctrl+Return sends.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown ||
+                            (event.key != Key.Enter && event.key != Key.NumPadEnter)) {
+                            return@onPreviewKeyEvent false
+                        }
+                        val newlineCombo = event.isCtrlPressed || event.isShiftPressed
+                        val shouldSend =
+                            if (ctx.enterToSend) !newlineCombo else event.isCtrlPressed
+                        if (!shouldSend) return@onPreviewKeyEvent false
+                        if (!sending && canSend) send()
+                        true
+                    },
             )
 
             TextButton(onClick = { openMention() }, enabled = !sending) {

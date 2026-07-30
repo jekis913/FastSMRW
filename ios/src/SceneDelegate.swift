@@ -73,6 +73,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidEnterBackground(_ scene: UIScene) {
         wasBackgrounded = true
+        // iOS can suspend (or terminate) us at any point from here, so publish the
+        // reading position now rather than waiting out the idle timer — otherwise the
+        // spot reached just before switching away never reaches the server.
+        state?.pause()
     }
 }
 

@@ -396,6 +396,8 @@ void CoreSession::handle(const json& cmd) {
         cmd_refresh_all();
     else if (c == "resume")
         cmd_resume();
+    else if (c == "pause")
+        cmd_pause();
     else if (c == "load_older")
         cmd_load_older(cmd);
     else if (c == "load_gap")
@@ -883,12 +885,28 @@ void CoreSession::cmd_resume() {
     TimelineController* tc = current();
     if (!tc)
         return;
-    // A move made before this app was backgrounded is already being pushed to
-    // the server; it must not suppress the first marker pull after another
-    // client may have advanced the shared position. Any movement made after
-    // resuming sets the flag again and still wins over the asynchronous pull.
+    // Publish the position we were on before being backgrounded *first*. It may
+    // still be sitting on the idle timer, and the pull below would otherwise read
+    // the older value the server still has and drag the user back to it. Push and
+    // pull share action_worker_, so the pull sees what we just sent.
+    commit_home_marker_for(tc);
+    // With our own position published, this refresh may pull: another client may
+    // have advanced the shared position while we were away. Any movement made
+    // after resuming sets the flag again and still wins over the async pull.
     tc->reset_user_moved();
     tc->refresh();
+}
+
+// The app is being backgrounded. On a phone the process can be suspended — or
+// killed outright — before the idle timer fires or the app ever exits, so publish
+// every position that's still waiting instead of losing it.
+void CoreSession::cmd_pause() {
+    std::vector<std::string> keys;
+    keys.reserve(marker_pending_.size());
+    for (const auto& [key, id] : marker_pending_)
+        keys.push_back(key);
+    for (const std::string& key : keys)
+        commit_home_marker(key); // erases from marker_pending_, hence the snapshot
 }
 
 void CoreSession::cmd_load_gap(const json& cmd) {

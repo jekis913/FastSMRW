@@ -65,6 +65,13 @@ class MainActivity : ComponentActivity() {
         if (hasResumed) vm.resume() else hasResumed = true
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Android can kill a backgrounded process at any time, so send the reading
+        // position now instead of waiting out the idle timer.
+        vm.pause()
+    }
+
     // singleTop: the fastsm://oauth redirect re-enters the live activity here.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
