@@ -1,6 +1,12 @@
 FastSMRW changelog
 ==================
 
+0.5.4
+-----
+
+- Fixed: reopening FastSM puts you back where you left off — a timeline appearing and landing on the newest post no longer throws away your saved place, in every app.
+- Fixed: on Android, your saved place is restored even when the posts around it take a moment to arrive, instead of leaving you at the top.
+
 0.5.3
 -----
 

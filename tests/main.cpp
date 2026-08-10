@@ -123,6 +123,7 @@ void test_position_hint_falls_back_to_nearest();
 void test_marker_restore_ignores_only_provisional_edge_focus();
 void test_marker_restore_reports_already_there();
 void test_note_selection_same_row_is_not_a_move();
+void test_restored_position_survives_default_edge_echo();
 
 static void test_version() {
     CHECK(fastsm::version() != nullptr);
@@ -229,6 +230,7 @@ int main() {
     test_marker_restore_ignores_only_provisional_edge_focus();
     test_marker_restore_reports_already_there();
     test_note_selection_same_row_is_not_a_move();
+    test_restored_position_survives_default_edge_echo();
 
     std::printf("%d checks, %d failures\n", fastsmtest::checks(), fastsmtest::failures());
     return fastsmtest::failures() == 0 ? 0 : 1;

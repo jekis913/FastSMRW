@@ -650,10 +650,18 @@ private fun StatusList(
     // Afterwards the core's position follows what we report, so re-applying it on
     // every timeline update would snap the list under the reader on each refresh.
     var restored by remember(timelineKey) { mutableStateOf(false) }
-    LaunchedEffect(timelineKey, rows) {
+    LaunchedEffect(timelineKey, rows, selectedId) {
         if (restored || rows.isEmpty()) return@LaunchedEffect
-        restored = true
+        if (selectedId.isBlank()) {
+            restored = true // nowhere to go back to: the top is the position
+            return@LaunchedEffect
+        }
+        // The remembered row may not be in the first batch — a cache load can land
+        // before the posts around it do. Keep waiting rather than giving up and
+        // stranding the reader at the top of the timeline.
         val idx = rows.indexOfFirst { it.id == selectedId }
+        if (idx < 0) return@LaunchedEffect
+        restored = true
         if (idx > 0) listState.scrollToItem(idx)
     }
 
@@ -674,6 +682,9 @@ private fun StatusList(
         var wasScrolling = false
         snapshotFlow { listState.isScrollInProgress }.distinctUntilChanged().collect { now ->
             if (wasScrolling && !now) {
+                // Once the reader has moved, a late-arriving remembered row must not
+                // pull them back to it.
+                restored = true
                 currentRows.value.getOrNull(listState.firstVisibleItemIndex)
                     ?.let { onNoteSelection(it.id) }
             }

@@ -926,8 +926,11 @@ void CoreSession::cmd_note_selection(const json& cmd) {
     if (!tc)
         return;
     const std::string id = cmd.value("id", std::string{});
-    tc->note_selection(id); // fires on_user_moved -> home-position push (see make_controller)
-    remember_position(tc, id);
+    // Only a real move is persisted. A list control echoing the row it focused when
+    // it populated would otherwise overwrite the position the user left off at with
+    // the newest post — and, with home sync on, publish that to every other device.
+    if (tc->note_selection(id)) // fires on_user_moved -> home push (see make_controller)
+        remember_position(tc, id);
 }
 
 bool CoreSession::sync_enabled_for(const TimelineController* tc) const {

@@ -299,3 +299,28 @@ void test_note_selection_same_row_is_not_a_move() {
     tc.note_selection("s:a"); // a real move still counts
     CHECK_EQ(moves, 2);
 }
+
+// The position restored from disk at startup must survive the echo a list control
+// sends when it populates and focuses its own top row. Persisting that echo is what
+// replaced the user's place with the newest post, so the next launch began at the
+// top — and, with home sync on, dragged every other device up there too.
+void test_restored_position_survives_default_edge_echo() {
+    TimelineSource src;
+    src.kind = TimelineSource::Kind::PostUsers; // static: no I/O
+    TimelineController tc(nullptr, src, nullptr, nullptr, nullptr, 40);
+    for (const char* id : {"c", "b", "a"}) // prepend order -> a, b, c
+        tc.ingest_realtime(mkitem(id));
+
+    // Startup: the remembered row is restored (it is present, so the date is unused).
+    tc.set_position_hint("s:c", 100);
+    CHECK_EQ(tc.selected_id(), std::string("s:c"));
+
+    // The list appears and focuses its top row. Not the user's doing: not a move,
+    // so the caller must not persist it.
+    CHECK(!tc.note_selection("s:a"));
+
+    // Now the user really moves. That is a move, and it disarms the guard.
+    CHECK(tc.note_selection("s:b"));
+    // From here on a top-row echo is an ordinary move again.
+    CHECK(tc.note_selection("s:a"));
+}

@@ -188,7 +188,11 @@ public:
     // row here; on switching back or after a refresh it restores this position
     // instead of jumping to the top (Mac parity). A "jump" (moving more than one
     // row) is pushed onto the nav history for Go Back.
-    void note_selection(const std::string& id);
+    // Returns whether this was a real move by the user. A list control echoing the
+    // row it focused on its own — the default edge row of a freshly populated list,
+    // or the row we are already on — returns false, so the caller knows not to
+    // persist it over the position the user actually left off at.
+    bool note_selection(const std::string& id);
     const std::string& selected_id() const { return selected_id_; }
     int visible_index_of(const std::string& id) const;
 
@@ -216,6 +220,10 @@ public:
     // the edge still cancels the restore and wins over the server position.
     void begin_marker_restore() { marker_restore_pending_ = true; }
     void finish_marker_restore() { marker_restore_pending_ = false; }
+    // Same idea, for the position restored from disk at startup: the list that
+    // appears may focus its top row before it has adopted the restored one. Armed
+    // by set_position_hint and disarmed by the first genuine move.
+    bool restore_pending() const { return marker_restore_pending_ || position_guard_; }
 
     // Cache key of the timeline that was current when this one was spawned, so
     // closing it returns there instead of a neighbor (Mac parity). Empty for the
@@ -257,6 +265,7 @@ private:
     bool auto_read_ = false;            // user enabled auto-read for this tab
     bool user_moved_position_ = false;  // user moved the home position since the last sync cycle
     bool marker_restore_pending_ = false; // server marker lookup/backfill is in progress
+    bool position_guard_ = false;       // a restored-from-disk position not yet confirmed by a move
     std::optional<PageCursor> scrollback_cursor_;
     std::vector<store::CacheGap> gaps_; // tracked middle gaps (after_id -> cursor)
     // Page-boundary cursors (row id -> cursor to fetch the page just below it),

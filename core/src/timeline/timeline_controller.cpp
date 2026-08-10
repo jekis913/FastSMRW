@@ -26,16 +26,35 @@ int TimelineController::visible_index_of(const std::string& id) const {
     return -1;
 }
 
-void TimelineController::note_selection(const std::string& id) {
+bool TimelineController::note_selection(const std::string& id) {
     // Re-reporting the row we're already on is not a move. Front ends echo the
     // current row for all sorts of reasons — a list re-selecting after a reload, a
     // scroll settling, adopting a position the core just restored — and counting
     // those as movement made an idle client look busy, so it stopped following the
     // synced home position and republished its own instead.
-    const bool same_row = (id == selected_id_);
+    if (id == selected_id_) {
+        // Re-reporting the row we're already on is not a move. Front ends echo the
+        // current row for all sorts of reasons — a list re-selecting after a reload,
+        // a scroll settling, adopting a position the core just restored — and
+        // counting those as movement made an idle client look busy, so it stopped
+        // following the synced home position and republished its own instead.
+        return false;
+    }
+    // iOS/VoiceOver (and some desktop list controls) focus the default edge row as
+    // soon as a newly-populated list appears, before it has adopted the position we
+    // restored. While a restore is pending that echo is provisional, not evidence
+    // that the user moved — and persisting it would overwrite, with the newest post,
+    // the very place the user left off at. A move to any other row is real, and
+    // cancels the restore as before.
+    const int default_edge =
+        reversed() && !visible_.empty() ? static_cast<int>(visible_.size()) - 1 : 0;
+    if (restore_pending() && visible_index_of(id) == default_edge) {
+        selected_id_ = id; // follow the list, but don't treat this as the user's place
+        return false;
+    }
     // Record a "jump" (move of more than one visible row, or to/from an item not
     // in the list) so Go Back can return here; single-row steps aren't recorded.
-    if (!selected_id_.empty() && selected_id_ != id) {
+    if (!selected_id_.empty()) {
         const int from = visible_index_of(selected_id_);
         const int to = visible_index_of(id);
         const int diff = from > to ? from - to : to - from;
@@ -47,20 +66,10 @@ void TimelineController::note_selection(const std::string& id) {
         }
     }
     selected_id_ = id;
-    if (same_row)
-        return;
-    // iOS/VoiceOver (and some desktop list controls) focus the default edge row
-    // as soon as a newly-populated list appears. While the first server-marker
-    // restore is pending, that focus echo is provisional rather than evidence
-    // that the user deliberately moved. A move to any other row still fires the
-    // callback and therefore cancels the restore as before.
-    const int selected = visible_index_of(selected_id_);
-    const int default_edge =
-        reversed() && !visible_.empty() ? static_cast<int>(visible_.size()) - 1 : 0;
-    if (marker_restore_pending_ && selected == default_edge)
-        return;
+    position_guard_ = false; // a real move: stop second-guessing the front end's echoes
     if (on_user_moved)
         on_user_moved();
+    return true;
 }
 
 std::string TimelineController::undo_navigation() {
@@ -379,6 +388,8 @@ void TimelineController::seed_users(std::vector<User> users) {
 void TimelineController::set_position_hint(const std::string& id, std::int64_t sort_date) {
     selected_id_ = id;
     restore_date_hint_ = sort_date;
+    // Guard the restored position until the user actually moves: see note_selection.
+    position_guard_ = true;
 }
 
 void TimelineController::resolve_position_hint() {
