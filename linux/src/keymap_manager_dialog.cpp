@@ -259,7 +259,10 @@ void KeymapManagerDialog::on_keymap(const json& e) {
     current_name_ = name;
     overrides_.clear();
     unbinds_.clear();
-    for (const auto& [action, key] : e.value("overrides", json::object()).items())
+    // Bind to a named object first: iterating .items() on the temporary returned
+    // by value() would dangle (the proxy outlives the temporary).
+    const json ov = e.value("overrides", json::object());
+    for (const auto& [action, key] : ov.items())
         overrides_[action] = key.get<std::string>();
     for (const auto& a : e.value("unbinds", json::array()))
         unbinds_.insert(a.get<std::string>());

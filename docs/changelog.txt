@@ -6,6 +6,8 @@ FastSMRW changelog
 
 - Fixed: reopening FastSM puts you back where you left off — a timeline appearing and landing on the newest post no longer throws away your saved place, in every app.
 - Fixed: on Android, your saved place is restored even when the posts around it take a moment to arrive, instead of leaving you at the top.
+- Fixed: on Linux, FastSM no longer closes itself moments after starting when the invisible interface is turned on, and the Keyboard Manager no longer closes it when you pick a keymap.
+- Fixed: on Linux, looking at another keymap in the Keyboard Manager no longer takes over the hotkeys you actually have active, matching Windows.
 
 0.5.3
 -----

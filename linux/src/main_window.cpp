@@ -1574,10 +1574,18 @@ void MainWindow::open_keymap_manager() {
 void MainWindow::ev_keymap(const json& e) {
     if (keymap_mgr_)
         keymap_mgr_->on_keymap(e); // the manager is open: feed it (same UI thread)
+    // Only (re)bind the global hotkeys for the ACTIVE keymap — ignore events for
+    // other keymaps the manager is merely browsing. Mirrors Windows ev_keymap.
+    const std::string active = settings_.value("invisible_keymap", std::string("default"));
+    if (e.value("name", std::string{}) != active)
+        return;
     if (invisible_mode_ == "off")
         return;
     std::unordered_map<std::string, std::string> bindings;
-    for (const auto& [key, action] : e.value("bindings", json::object()).items())
+    // Bind to a named object first: iterating .items() on the temporary returned
+    // by value() would dangle (the proxy outlives the temporary).
+    const json binds = e.value("bindings", json::object());
+    for (const auto& [key, action] : binds.items())
         if (action.is_string())
             bindings[key] = action.get<std::string>();
     std::string error;
