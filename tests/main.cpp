@@ -40,6 +40,7 @@ void test_bluesky_facet_mapping();
 void test_bluesky_embed_external_and_video();
 void test_bluesky_embed_record_with_media();
 void test_bluesky_labels_content_warning();
+void test_bluesky_replied_to_text_field();
 
 // From test_bluesky_richtext.cpp
 void test_bluesky_facets_link();
@@ -69,6 +70,9 @@ void test_presenter_demojify_and_mentions();
 void test_presenter_wrap_and_separator();
 void test_presenter_stats_nonzero();
 void test_presenter_poll();
+void test_presenter_boosted_by_handle();
+void test_presenter_copy_keeps_line_breaks();
+void test_presenter_post_info_visibility();
 void test_reply_participants();
 void test_post_links();
 
@@ -76,6 +80,7 @@ void test_post_links();
 void test_speech_defaults();
 void test_speech_normalized();
 void test_settings_roundtrip();
+void test_speech_catalog_covers_every_field();
 
 // From test_sse.cpp
 void test_sse_basic();
@@ -170,6 +175,7 @@ int main() {
     test_bluesky_embed_external_and_video();
     test_bluesky_embed_record_with_media();
     test_bluesky_labels_content_warning();
+    test_bluesky_replied_to_text_field();
 
     test_bluesky_facets_link();
     test_bluesky_facets_link_trailing_punct();
@@ -192,11 +198,15 @@ int main() {
     test_presenter_wrap_and_separator();
     test_presenter_stats_nonzero();
     test_presenter_poll();
+    test_presenter_boosted_by_handle();
+    test_presenter_copy_keeps_line_breaks();
+    test_presenter_post_info_visibility();
     test_reply_participants();
     test_post_links();
     test_speech_defaults();
     test_speech_normalized();
     test_settings_roundtrip();
+    test_speech_catalog_covers_every_field();
     test_sse_basic();
     test_sse_split_across_feeds();
     test_sse_multiline_crlf_comments();

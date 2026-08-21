@@ -169,7 +169,8 @@ Invisible interface, and Updates. Highlights:
 
 - Timelines: auto-refresh, streaming, reversed timelines, home-position sync,
   and the Movement Units editor.
-- Audio: soundpacks and volume.
+- Audio: soundpacks, sound effect and media volume, and which output
+  device each of those plays through.
 - Earcons: the little sounds that mark images, media, mentions, pins, and polls.
 - Speech: what is spoken for posts, users, and notifications — reorder fields,
   turn them off, and add your own text before or after any field. Content

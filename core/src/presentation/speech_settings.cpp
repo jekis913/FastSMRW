@@ -36,6 +36,12 @@ const char* field_key(StatusSpeechField f) {
         return "source";
     case StatusSpeechField::ReplyingTo:
         return "replyingTo";
+    case StatusSpeechField::ReplyingToText:
+        return "replyingToText";
+    case StatusSpeechField::Thread:
+        return "thread";
+    case StatusSpeechField::BoostedByHandle:
+        return "boostedByHandle";
     }
     return "";
 }
@@ -72,13 +78,35 @@ const char* field_display_name(StatusSpeechField f) {
         return "Posting app / source";
     case StatusSpeechField::ReplyingTo:
         return "Replying to (Bluesky)";
+    case StatusSpeechField::ReplyingToText:
+        return "Replied-to post text (Bluesky)";
+    case StatusSpeechField::Thread:
+        return "Thread indicator";
+    case StatusSpeechField::BoostedByHandle:
+        return "Boosted by (handle)";
     }
     return "";
 }
 
+namespace {
+// The enum values 0..last, built once. `last` is the only place the count is
+// written down; adding a field means extending the enum and moving this bound.
+template <class Field> std::vector<Field> all_fields(Field last) {
+    std::vector<Field> fields;
+    for (int i = 0; i <= static_cast<int>(last); ++i)
+        fields.push_back(static_cast<Field>(i));
+    return fields;
+}
+} // namespace
+
+const std::vector<StatusSpeechField>& status_field_catalog() {
+    static const std::vector<StatusSpeechField> fields =
+        all_fields(StatusSpeechField::BoostedByHandle);
+    return fields;
+}
+
 bool status_field_from_key(std::string_view key, StatusSpeechField& out) {
-    for (int i = 0; i <= static_cast<int>(StatusSpeechField::ReplyingTo); ++i) {
-        const auto f = static_cast<StatusSpeechField>(i);
+    for (StatusSpeechField f : status_field_catalog()) {
         if (key == field_key(f)) {
             out = f;
             return true;
@@ -131,9 +159,13 @@ const char* field_display_name(UserSpeechField f) {
     return "";
 }
 
+const std::vector<UserSpeechField>& user_field_catalog() {
+    static const std::vector<UserSpeechField> fields = all_fields(UserSpeechField::Posts);
+    return fields;
+}
+
 bool user_field_from_key(std::string_view key, UserSpeechField& out) {
-    for (int i = 0; i <= static_cast<int>(UserSpeechField::Posts); ++i) {
-        const auto f = static_cast<UserSpeechField>(i);
+    for (UserSpeechField f : user_field_catalog()) {
         if (key == field_key(f)) {
             out = f;
             return true;
@@ -174,9 +206,14 @@ const char* field_display_name(NotificationSpeechField f) {
     return "";
 }
 
+const std::vector<NotificationSpeechField>& notification_field_catalog() {
+    static const std::vector<NotificationSpeechField> fields =
+        all_fields(NotificationSpeechField::Time);
+    return fields;
+}
+
 bool notification_field_from_key(std::string_view key, NotificationSpeechField& out) {
-    for (int i = 0; i <= static_cast<int>(NotificationSpeechField::Time); ++i) {
-        const auto f = static_cast<NotificationSpeechField>(i);
+    for (NotificationSpeechField f : notification_field_catalog()) {
         if (key == field_key(f)) {
             out = f;
             return true;
@@ -209,7 +246,9 @@ SpeechSettings SpeechSettings::defaults() {
     SpeechSettings s;
     s.status = {
         {S::BoostedBy},  {S::Author},   {S::Handle, false}, {S::ContentWarning},
-        {S::ReplyingTo}, {S::Text},     {S::Quote},         {S::Media},
+        {S::ReplyingTo}, {S::ReplyingToText, false}, {S::Thread, false},
+        {S::BoostedByHandle, false},
+        {S::Text},       {S::Quote},    {S::Media},
         {S::Poll},       {S::Time},     {S::Stats},         {S::Favorited},
         {S::Boosted},    {S::Visibility, false},            {S::Source, false},
     };
@@ -224,6 +263,8 @@ SpeechSettings SpeechSettings::defaults() {
     // Auto-read defaults to a terse read of a new post (no time/stats/reaction noise).
     s.autoread = {
         {S::BoostedBy},        {S::Author},   {S::Handle, false}, {S::ContentWarning},
+        {S::ReplyingTo, false}, {S::ReplyingToText, false}, {S::Thread, false},
+        {S::BoostedByHandle, false},
         {S::Text},             {S::Quote},    {S::Media},         {S::Poll},
         {S::Time, false},      {S::Stats, false}, {S::Favorited, false}, {S::Boosted, false},
         {S::Visibility, false}, {S::Source, false},
@@ -231,6 +272,8 @@ SpeechSettings SpeechSettings::defaults() {
     // Copy defaults to author + @handle + text (handle ON so the @ comes across).
     s.copy_status = {
         {S::BoostedBy},   {S::Author},       {S::Handle},           {S::ContentWarning},
+        {S::ReplyingTo, false}, {S::ReplyingToText, false}, {S::Thread, false},
+        {S::BoostedByHandle, false},
         {S::Text},        {S::Quote},        {S::Media, false},     {S::Poll, false},
         {S::Time, false}, {S::Stats, false}, {S::Favorited, false}, {S::Boosted, false},
         {S::Visibility, false}, {S::Source, false},

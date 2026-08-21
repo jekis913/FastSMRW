@@ -58,7 +58,27 @@ final class SettingsWindowController: NSWindowController {
                        key: "boundary_sound", default: true)
             p.popup("Soundpack:", options: state.soundpacks.map { ($0, $0) },
                     key: "soundpack", default: "Default")
-            p.slider("Volume:", key: "sound_volume", default: 100, min: 0, max: 100)
+            p.slider("Sound effect volume:", key: "sound_volume", default: 100, min: 0, max: 100)
+            p.slider("Media volume:", key: "media_volume", default: 100, min: 0, max: 100)
+            // "System default" is the empty setting. A saved device that isn't
+            // connected right now stays in the list, so opening Settings doesn't
+            // quietly reset the choice.
+            func deviceOptions(_ devices: [String], _ current: String) -> [(String, String)] {
+                var options = [("System default", "")]
+                options += devices.map { ($0, $0) }
+                if !current.isEmpty, !devices.contains(current) {
+                    options.append(("\(current) (not connected)", current))
+                }
+                return options
+            }
+            p.popup("Sound effects device:",
+                    options: deviceOptions(state.soundDevices,
+                                           state.settingsRaw["sound_device"] as? String ?? ""),
+                    key: "sound_device", default: "")
+            p.popup("Media device:",
+                    options: deviceOptions(AudioDevices.outputNames(),
+                                           state.settingsRaw["media_device"] as? String ?? ""),
+                    key: "media_device", default: "")
             p.button("Open Soundpacks Folder") {
                 let dir = state.configDir.appendingPathComponent("soundpacks", isDirectory: true)
                 try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

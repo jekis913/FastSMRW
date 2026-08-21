@@ -287,7 +287,7 @@ const std::vector<int> kEmojiValues = {static_cast<int>(EmojiRemoval::None),
 } // namespace
 
 std::optional<AppSettings> show_settings_dialog(GtkWindow* parent, AppSettings settings,
-                                                const std::vector<std::string>& soundpacks) {
+                                                const AudioChoices& audio) {
     GtkWidget* dialog = gtk_dialog_new_with_buttons(
         "Settings", parent,
         static_cast<GtkDialogFlags>(GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT), "_Cancel",
@@ -349,16 +349,37 @@ std::optional<AppSettings> show_settings_dialog(GtkWindow* parent, AppSettings s
     {
         GtkWidget* p = b.page("_Audio");
         b.check(p, "_Play sounds", &settings.sounds_enabled);
+        // "System default" is the empty setting; a saved device that isn't here
+        // right now is kept as an entry of its own so simply opening Settings
+        // with the headset unplugged doesn't reset the choice.
+        auto device_options = [](const std::vector<std::string>& devices,
+                                 const std::string& current) {
+            std::vector<std::pair<std::string, std::string>> options{{"", "System default"}};
+            bool found = false;
+            for (const auto& d : devices) {
+                options.push_back({d, d});
+                found = found || d == current;
+            }
+            if (!current.empty() && !found)
+                options.push_back({current, current + " (not connected)"});
+            return options;
+        };
         std::vector<std::pair<std::string, std::string>> packs;
         bool have_current = false;
-        for (const auto& pack : soundpacks) {
+        for (const auto& pack : audio.soundpacks) {
             packs.push_back({pack, pack});
             have_current = have_current || pack == settings.soundpack;
         }
         if (packs.empty() || !have_current)
             packs.insert(packs.begin(), {settings.soundpack, settings.soundpack});
         b.combo(p, "Sound_pack:", packs, &settings.soundpack);
-        b.spin(p, "_Volume (percent):", 0, 100, &settings.sound_volume);
+        b.spin(p, "Sound effect vo_lume (percent):", 0, 100, &settings.sound_volume);
+        b.spin(p, "_Media volume (percent):", 0, 100, &settings.media_volume);
+        b.combo(p, "Sound effects _device:",
+                device_options(audio.sound_devices, settings.sound_device),
+                &settings.sound_device);
+        b.combo(p, "Media d_evice:", device_options(audio.media_devices, settings.media_device),
+                &settings.media_device);
         b.check(p, "Play a _boundary chime at the top or bottom of a timeline",
                 &settings.boundary_sound);
     }

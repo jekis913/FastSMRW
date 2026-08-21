@@ -3,6 +3,7 @@
 #include <commctrl.h>
 
 #include "edit_util.hpp"
+#include "utf.hpp"
 
 #include "../resources/resource.h"
 
@@ -117,15 +118,7 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         auto* c = reinterpret_cast<Ctx*>(lp);
         SetWindowLongPtrW(dlg, DWLP_USER, reinterpret_cast<LONG_PTR>(c));
         // Win32 multiline EDIT needs CRLF line breaks; the core composes with LF.
-        std::wstring crlf;
-        crlf.reserve(c->text->size() + 16);
-        for (wchar_t ch : *c->text) {
-            if (ch == L'\n')
-                crlf += L"\r\n";
-            else
-                crlf += ch;
-        }
-        SetDlgItemTextW(dlg, IDC_POSTINFO_TEXT, crlf.c_str());
+        SetDlgItemTextW(dlg, IDC_POSTINFO_TEXT, to_crlf(*c->text).c_str());
         enable_edit_select_all(GetDlgItem(dlg, IDC_POSTINFO_TEXT)); // Ctrl+A select-all
         EnableWindow(GetDlgItem(dlg, IDC_POSTINFO_QUOTE), c->quote_ok);
         EnableWindow(GetDlgItem(dlg, IDC_POSTINFO_BROWSER), c->browser_ok);

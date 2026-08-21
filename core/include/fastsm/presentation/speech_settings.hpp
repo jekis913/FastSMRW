@@ -25,8 +25,12 @@ enum class StatusSpeechField {
     Boosted,
     Visibility,
     Source,
-    ReplyingTo, // "Replying to @X" for Bluesky reply posts (kept last: enum
-                // order is the catalog-scan bound, not the spoken order)
+    ReplyingTo,     // "Replying to @X" for Bluesky reply posts
+    ReplyingToText, // the replied-to post's own text (Bluesky feeds carry it)
+    Thread,          // "Thread" when the post sits in a conversation
+    BoostedByHandle, // "@user boosted", for people who never want display names
+                     // (keep new fields last: enum order is the catalog-scan
+                     // bound, not the spoken order)
 };
 
 enum class UserSpeechField {
@@ -47,6 +51,14 @@ enum class NotificationSpeechField {
     Text,   // the related post's text
     Time,
 };
+
+// Every field of each kind, in enum order — the one place that knows how many
+// there are. Both the key lookups and the front ends' field pickers read this,
+// so a field added to the enum shows up everywhere without a second list to
+// keep in step.
+const std::vector<StatusSpeechField>& status_field_catalog();
+const std::vector<UserSpeechField>& user_field_catalog();
+const std::vector<NotificationSpeechField>& notification_field_catalog();
 
 // Stable string id (for settings.json) and human label (for the settings UI).
 const char* field_key(StatusSpeechField f);

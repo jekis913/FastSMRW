@@ -120,31 +120,67 @@ struct SoundManager::Impl {
         return true;
     }
 
-#if defined(__APPLE__) && TARGET_OS_IPHONE
+    // Our own context, rather than the one ma_engine_init would make privately:
+    // enumerating devices needs it, and on iOS it carries the session choice
+    // below. Reused across engine revives.
     ma_context context{};
     bool context_ok = false;
-#endif
 
-    // Bring up the engine. On iOS, miniaudio's default takes over the app's
-    // audio session with PlayAndRecord — which grabs the microphone and routes
-    // output to the quiet earpiece speaker. The app owns the session there
-    // (playback, mixed with VoiceOver/music), so tell miniaudio to leave it
-    // alone; the context carrying that choice is reused across engine revives.
-    bool init_engine() {
+    // The chosen output device, resolved from its name. Kept so an engine rebuild
+    // (device-loss recovery, a soundpack change) lands back on the same device.
+    ma_device_id device_id{};
+    bool have_device_id = false;
+
+    // On iOS, miniaudio's default takes over the app's audio session with
+    // PlayAndRecord — which grabs the microphone and routes output to the quiet
+    // earpiece speaker. The app owns the session there (playback, mixed with
+    // VoiceOver/music), so tell miniaudio to leave it alone.
+    bool ensure_context() {
+        if (context_ok)
+            return true;
+        ma_context_config cfg = ma_context_config_init();
 #if defined(__APPLE__) && TARGET_OS_IPHONE
-        if (!context_ok) {
-            ma_context_config cfg = ma_context_config_init();
-            cfg.coreaudio.sessionCategory = ma_ios_session_category_none;
-            if (ma_context_init(nullptr, 0, &cfg, &context) != MA_SUCCESS)
-                return false;
-            context_ok = true;
+        cfg.coreaudio.sessionCategory = ma_ios_session_category_none;
+#endif
+        if (ma_context_init(nullptr, 0, &cfg, &context) != MA_SUCCESS)
+            return false;
+        context_ok = true;
+        return true;
+    }
+
+    // Look up a playback device by the name the user picked. False (and an
+    // untouched `out`) means "use the system default".
+    bool resolve_device(const std::string& name, ma_device_id& out) {
+        if (name.empty() || !ensure_context())
+            return false;
+        ma_device_info* infos = nullptr;
+        ma_uint32 count = 0;
+        if (ma_context_get_devices(&context, &infos, &count, nullptr, nullptr) != MA_SUCCESS)
+            return false;
+        for (ma_uint32 i = 0; i < count; ++i) {
+            if (name == infos[i].name) {
+                out = infos[i].id;
+                return true;
+            }
         }
+        return false; // the device is gone — fall back to the default
+    }
+
+    bool init_engine() {
+        if (!ensure_context())
+            return false;
         ma_engine_config cfg = ma_engine_config_init();
         cfg.pContext = &context;
+        if (have_device_id) {
+            cfg.pPlaybackDeviceID = &device_id;
+            if (ma_engine_init(&cfg, &engine) == MA_SUCCESS)
+                return true;
+            // The chosen device won't open (unplugged, disabled, in exclusive use).
+            // Better the default device than no sound at all.
+            engine = ma_engine{};
+            cfg.pPlaybackDeviceID = nullptr;
+        }
         return ma_engine_init(&cfg, &engine) == MA_SUCCESS;
-#else
-        return ma_engine_init(nullptr, &engine) == MA_SUCCESS;
-#endif
     }
 };
 
@@ -158,10 +194,8 @@ SoundManager::~SoundManager() {
         impl_->stop_all();
         ma_engine_uninit(&impl_->engine);
     }
-#if defined(__APPLE__) && TARGET_OS_IPHONE
     if (impl_->context_ok)
         ma_context_uninit(&impl_->context);
-#endif
     delete impl_;
 }
 
@@ -177,6 +211,34 @@ void SoundManager::reinitialize() {
     impl_->engine = ma_engine{};
     if (impl_->init_engine())
         impl_->ok = true;
+}
+
+void SoundManager::set_output_device(const std::string& name) {
+    if (name == output_device_)
+        return;
+    output_device_ = name;
+    // Resolve the name once, here, so every later engine rebuild (sleep/wake
+    // recovery included) comes back on the device the user chose.
+    impl_->have_device_id = impl_->resolve_device(name, impl_->device_id);
+    reinitialize();
+}
+
+std::vector<std::string> SoundManager::list_output_devices() const {
+    std::vector<std::string> names;
+    if (!impl_->ensure_context())
+        return names;
+    ma_device_info* infos = nullptr;
+    ma_uint32 count = 0;
+    if (ma_context_get_devices(&impl_->context, &infos, &count, nullptr, nullptr) != MA_SUCCESS)
+        return names;
+    for (ma_uint32 i = 0; i < count; ++i) {
+        const std::string name = infos[i].name;
+        // Some backends list the same endpoint twice; a duplicate name would be
+        // indistinguishable in the settings list anyway.
+        if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end())
+            names.push_back(name);
+    }
+    return names;
 }
 
 void SoundManager::set_soundpack(const std::string& name) {

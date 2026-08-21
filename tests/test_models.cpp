@@ -137,6 +137,15 @@ void test_codec_corrupt_is_miss() {
     std::string blob = store::encode_items({TimelineItem{sample_inner()}});
     blob.resize(blob.size() - 5);
     CHECK_EQ(store::decode_items(blob).size(), size_t(0));
+
+    // A cache written by an older version. The magic is what stops us reading a
+    // record whose fields have since moved: without that guard the decoder walks
+    // off the end of every string it thinks it found. Whenever the layout
+    // changes, the magic must change with it — this is the check that proves it.
+    std::string old_version = store::encode_items({TimelineItem{sample_inner()}});
+    CHECK(old_version.size() > 4);
+    old_version[3] = static_cast<char>(old_version[3] - 1); // the previous magic
+    CHECK_EQ(store::decode_items(old_version).size(), size_t(0));
 }
 
 // A row's id must name the ROW, not the newest thing inside it. Two producers

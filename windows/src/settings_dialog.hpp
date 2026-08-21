@@ -11,13 +11,21 @@
 
 namespace fastsmui {
 
+// The lists the Audio page offers, gathered by the caller: soundpacks and the
+// sound-effect devices come from the core, the media devices from DirectShow.
+// An empty device list just leaves that picker at "System default".
+struct AudioChoices {
+    std::vector<std::string> soundpacks;
+    std::vector<std::string> sound_devices;
+    std::vector<std::string> media_devices;
+};
+
 // Shows the tabbed Settings dialog (a Windows property sheet). Returns the
 // edited settings if the user clicked OK, else nullopt. `open_manager`, if set,
 // is invoked (with the settings dialog as parent) when the user clicks the
 // Keyboard Manager button on the Invisible interface tab.
 std::optional<fastsm::store::AppSettings>
 show_settings_dialog(HWND parent, HINSTANCE inst, const fastsm::store::AppSettings& current,
-                     const std::vector<std::string>& soundpacks,
-                     std::function<void(HWND)> open_manager = {});
+                     const AudioChoices& audio, std::function<void(HWND)> open_manager = {});
 
 } // namespace fastsmui

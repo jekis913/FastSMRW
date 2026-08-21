@@ -43,6 +43,10 @@ struct Status {
     // Whether the authenticated Bluesky user follows the replied-to author.
     // nullopt means the feed did not provide enough viewer data to know.
     std::optional<bool> reply_to_author_followed;
+    // The replied-to post's own text, when the feed embeds the parent post
+    // (Bluesky) — spoken by the "Replied-to post text" speech field, so a reply
+    // can be read with the post it answers. Mastodon feeds don't carry it.
+    std::optional<std::string> reply_to_text;
     std::shared_ptr<Status> reblog; // the boosted status, when this is a boost
     std::shared_ptr<Status> quote;  // the quoted status
     std::vector<MediaAttachment> media_attachments;

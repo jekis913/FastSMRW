@@ -10,7 +10,7 @@ using namespace fastsm::present;
 
 void test_speech_defaults() {
     const auto d = SpeechSettings::defaults();
-    CHECK_EQ(d.status.size(), size_t(15));
+    CHECK_EQ(d.status.size(), size_t(18));
     CHECK_EQ(d.user.size(), size_t(8));
     for (const auto& it : d.status) {
         if (it.field == StatusSpeechField::Handle)
@@ -28,7 +28,7 @@ void test_speech_normalized() {
     partial.status = {{StatusSpeechField::Text, true}, {StatusSpeechField::Author, false}};
     const auto norm = partial.normalized();
 
-    CHECK_EQ(norm.status.size(), size_t(15)); // every field present exactly once
+    CHECK_EQ(norm.status.size(), size_t(18)); // every field present exactly once
     CHECK(norm.status[0].field == StatusSpeechField::Text);   // saved order kept
     CHECK(norm.status[1].field == StatusSpeechField::Author);
     CHECK(!norm.status[1].enabled);                           // saved toggle kept
@@ -85,4 +85,35 @@ void test_settings_roundtrip() {
     CHECK(loaded.settings.speech == cfg.settings.speech.normalized());
 
     std::filesystem::remove_all(dir, ec);
+}
+
+// The catalog the apps build their field pickers from used to be a hand-written
+// list in core_session, and three fields added to the enum never reached it —
+// so they were invisible everywhere except Windows and Linux. Every field of
+// every kind must be in its catalog, with a key and a label.
+void test_speech_catalog_covers_every_field() {
+    using namespace fastsm::present;
+    const auto& status = status_field_catalog();
+    CHECK_EQ(status.size(), SpeechSettings::defaults().status.size());
+    CHECK(status.front() == StatusSpeechField::BoostedBy);
+    CHECK(status.back() == StatusSpeechField::BoostedByHandle);
+
+    // A key and a label each, and the key round-trips.
+    for (StatusSpeechField f : status) {
+        CHECK(std::string(field_key(f)) != std::string());
+        CHECK(std::string(field_display_name(f)) != std::string());
+        StatusSpeechField back{};
+        CHECK(status_field_from_key(field_key(f), back));
+        CHECK(back == f);
+    }
+    for (UserSpeechField f : user_field_catalog()) {
+        CHECK(std::string(field_key(f)) != std::string());
+        CHECK(std::string(field_display_name(f)) != std::string());
+    }
+    for (NotificationSpeechField f : notification_field_catalog()) {
+        CHECK(std::string(field_key(f)) != std::string());
+        CHECK(std::string(field_display_name(f)) != std::string());
+    }
+    CHECK_EQ(user_field_catalog().size(), SpeechSettings::defaults().user.size());
+    CHECK_EQ(notification_field_catalog().size(), SpeechSettings::defaults().notification.size());
 }

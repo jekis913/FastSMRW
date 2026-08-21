@@ -10,7 +10,7 @@ namespace {
 // cleanly (a magic mismatch -> empty) instead of being read with a mismatched
 // reader. v2 added Status::url. v6 added Notification group_key + notifications_count.
 // v7 added Status::filtered + tags. v9 added Bluesky reply-parent metadata.
-constexpr char kMagic[4] = {'F', 'S', 'C', '9'};
+constexpr char kMagic[4] = {'F', 'S', 'C', 'A'};
 // Guard against runaway recursion if a file is ever corrupt/misaligned: boost/
 // quote nesting is shallow in practice.
 constexpr int kMaxStatusDepth = 24;
@@ -223,6 +223,7 @@ void write_status(Writer& w, const Status& s) {
     w.opt_str(s.in_reply_to_account_id);
     w.opt_str(s.reply_to_handle);
     w.opt_str(s.reply_to_author_id);
+    w.opt_str(s.reply_to_text);
     w.boolean(s.reply_to_author_followed.has_value());
     if (s.reply_to_author_followed)
         w.boolean(*s.reply_to_author_followed);
@@ -308,6 +309,7 @@ Status read_status(Reader& r, int depth = 0) {
     s.in_reply_to_account_id = r.opt_str();
     s.reply_to_handle = r.opt_str();
     s.reply_to_author_id = r.opt_str();
+    s.reply_to_text = r.opt_str();
     if (r.boolean())
         s.reply_to_author_followed = r.boolean();
     if (r.boolean())

@@ -1,6 +1,17 @@
 FastSMRW changelog
 ==================
 
+0.5.5
+-----
+
+- New: on Windows, Linux and the Mac, choose which output device sound effects play through, and which one media plays through, in the Audio settings.
+- New: on Windows, Linux and the Mac, a media volume in the Audio settings that the player's Up and Down keys also move — and it is remembered, so the next thing you play starts at the level you chose.
+- New: an optional "Replied-to post text" field that reads the post a Bluesky reply is answering; turn it on under Speech.
+- New: an optional "Thread indicator" field that says "Thread" on any post that is part of a conversation; turn it on under Speech.
+- New: a "Boosted by (handle)" speech field, so you can hear who boosted a post as an @handle instead of a display name.
+- Fixed: the view post dialog now tells you whether a post is public, quiet public, followers only, or to specific people.
+- Fixed: copying a post to the clipboard keeps the line breaks its author wrote, instead of running the paragraphs together.
+
 0.5.4
 -----
 

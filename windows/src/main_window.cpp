@@ -846,7 +846,8 @@ void MainWindow::dispatch_cmd(const json& cmd) {
 }
 
 void MainWindow::ev_copy(const json& e) {
-    const std::wstring text = to_wide(e.value("text", std::string{}));
+    // CRLF, or the line breaks a copied post now carries paste as boxes.
+    const std::wstring text = to_crlf(to_wide(e.value("text", std::string{})));
     if (text.empty() || !OpenClipboard(hwnd_))
         return;
     EmptyClipboard();
@@ -1649,11 +1650,13 @@ void MainWindow::do_add_account() {
 
 void MainWindow::do_settings() {
     store::AppSettings s = store::settings_from_json(settings_);
-    std::vector<std::string> packs = soundpacks_.empty()
-                                         ? std::vector<std::string>{"Default"}
-                                         : soundpacks_;
+    AudioChoices audio;
+    audio.soundpacks = soundpacks_.empty() ? std::vector<std::string>{"Default"} : soundpacks_;
+    audio.sound_devices = sound_devices_; // the core's mixer devices, from the settings event
+    for (const std::wstring& d : media_output_devices())
+        audio.media_devices.push_back(to_utf8(d)); // DirectShow's, which can differ
     auto open_mgr = [this](HWND parent) { open_keymap_manager(parent); };
-    if (auto result = show_settings_dialog(hwnd_, inst_, s, packs, open_mgr)) {
+    if (auto result = show_settings_dialog(hwnd_, inst_, s, audio, open_mgr)) {
         // The Keyboard Manager (reachable from a button inside this dialog) switches
         // the active keymap directly in the core while the dialog is open. The dialog
         // has no control for it, so its snapshot still holds the old name — carry the
@@ -2387,6 +2390,14 @@ void MainWindow::ev_settings(const json& e) {
     soundpacks_.clear();
     for (const auto& p : e.value("soundpacks", json::array()))
         soundpacks_.push_back(p.get<std::string>());
+    sound_devices_.clear();
+    for (const auto& d : e.value("sound_devices", json::array()))
+        sound_devices_.push_back(d.get<std::string>());
+    // A media volume change while something is already playing in the background
+    // should be heard now, not next time. (The device only applies to a new
+    // stream — it's chosen when the graph is built.)
+    if (media_bg_)
+        media_bg_->set_volume(settings_.value("media_volume", 100));
     if (action_catalog_.empty()) // load once so the Keyboard Manager has its actions
         dispatch_cmd({{"cmd", "get_action_catalog"}});
     apply_invisible();
@@ -2980,8 +2991,17 @@ void MainWindow::ev_media_open(const json& e) {
         return;
     }
     leave_layer(); // a window is opening; leave the layer (restores an overlay)
+    MediaPlayerOptions opts;
+    opts.device = to_wide(settings_.value("media_device", std::string{}));
+    opts.volume = settings_.value("media_volume", 100);
+    // Up/Down in the player move the same level the Sounds page shows, and it
+    // sticks: the core persists it and hands it back on the next settings event.
+    opts.on_volume = [this](int level) {
+        dispatch_cmd({{"cmd", "set_media_volume"}, {"volume", level}});
+    };
     const bool played = show_media_player(hwnd_, inst_, title, url,
-                                          [this](const std::wstring& m) { announce(to_utf8(m)); });
+                                          [this](const std::wstring& m) { announce(to_utf8(m)); },
+                                          std::move(opts));
     if (!played) // couldn't stream it (e.g. an unsupported codec) -> system player
         ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOW);
 }
@@ -2989,6 +3009,8 @@ void MainWindow::ev_media_open(const json& e) {
 void MainWindow::play_media_background(const std::wstring& url, const std::wstring& title) {
     if (!media_bg_)
         media_bg_ = std::make_unique<MediaPlayback>();
+    media_bg_->set_output_device(to_wide(settings_.value("media_device", std::string{})));
+    media_bg_->set_volume(settings_.value("media_volume", 100));
     if (media_bg_->play(url)) {
         announce("Playing " + to_utf8(title));
         SetTimer(hwnd_, kMediaBgTimer, 1000, nullptr); // auto-clear when it ends

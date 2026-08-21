@@ -59,6 +59,17 @@ public:
     void set_enabled(bool enabled) { enabled_ = enabled; }
     void set_volume(float volume) { volume_ = volume; } // 0.0 .. 1.0
 
+    // Which output device earcons play through, by name ("" = whatever the system
+    // default is). Names come from list_output_devices(); a name that no longer
+    // matches a present device quietly falls back to the default, so unplugging
+    // the chosen headset doesn't silence the app. Rebuilds the engine when the
+    // device actually changes.
+    void set_output_device(const std::string& name);
+
+    // Playback device names in the backend's own order. The system default is not
+    // in the list — front ends offer that as their own "System default" choice.
+    std::vector<std::string> list_output_devices() const;
+
     // Tear down and rebuild the audio engine. Call after the machine resumes from
     // sleep/hibernation, when the backing output device may have been invalidated
     // (symptom: earcons go silent). Decoded PCM is kept; only the engine and any
@@ -87,6 +98,7 @@ private:
     std::string active_pack_;
     bool enabled_ = true;
     float volume_ = 1.0f;
+    std::string output_device_; // "" = system default
 };
 
 } // namespace fastsm::sound

@@ -524,6 +524,8 @@ void CoreSession::handle(const json& cmd) {
         cmd_delete_keymap(cmd);
     else if (c == "perform_action")
         cmd_perform_action(cmd);
+    else if (c == "set_media_volume")
+        cmd_set_media_volume(cmd);
     else if (c == "set_window_shown")
         cmd_set_window_shown(cmd);
     else if (c == "get_layer_keymap")
@@ -3075,6 +3077,7 @@ void CoreSession::cmd_reset_audio() {
     // sound_ call, so there's no cross-thread access to the engine.
     log::write("reset_audio: reinitializing the sound engine after resume");
     sound_.reinitialize();
+    sound_devices_.clear(); // devices often change across a resume: enumerate afresh
 }
 
 // --- invisible interface ---
@@ -3373,6 +3376,20 @@ void CoreSession::invisible_autoload(TimelineController* tc, int visible_index) 
 void CoreSession::cmd_set_window_shown(const json& cmd) {
     settings_.window_shown = cmd.value("shown", true);
     save_config(); // lightweight: just persist, no re-render
+}
+
+// The media player's volume keys (and the Sounds settings slider) both land
+// here: one persisted value, so the level you set with the arrows is the level
+// you get next time — and the level the slider shows.
+void CoreSession::cmd_set_media_volume(const json& cmd) {
+    const int volume = std::clamp(cmd.value("volume", settings_.media_volume), 0, 100);
+    if (volume == settings_.media_volume)
+        return;
+    settings_.media_volume = volume;
+    save_config();
+    // Reuse the cached device list: this runs on every press of the player's
+    // volume key, and re-enumerating the sound hardware each time would drag.
+    emit_settings(/*refresh_devices=*/false);
 }
 
 void CoreSession::cmd_check_for_update(const json& cmd) {
@@ -4153,6 +4170,7 @@ void CoreSession::apply_settings() {
         }
     sound_.set_enabled(settings_.sounds_enabled);
     sound_.set_volume(std::clamp(settings_.sound_volume, 0, 100) / 100.0f);
+    sound_.set_output_device(settings_.sound_device); // no-op unless it changed
     apply_active_soundpack(); // the selected account's pack (or the global default)
     present::SpeechConfig::set_current(settings_.speech);
     present::TextConfig::set_current(settings_.text);
@@ -4198,21 +4216,13 @@ void CoreSession::cmd_get_client_filter() { emit_client_filter(); }
 // speech arrays (which are normalized to include every field).
 void CoreSession::cmd_get_speech_catalog() {
     using namespace fastsm::present;
-    auto status_fields = {StatusSpeechField::BoostedBy, StatusSpeechField::Author,
-                          StatusSpeechField::Handle, StatusSpeechField::ContentWarning,
-                          StatusSpeechField::ReplyingTo, StatusSpeechField::Text,
-                          StatusSpeechField::Quote, StatusSpeechField::Media,
-                          StatusSpeechField::Poll, StatusSpeechField::Time,
-                          StatusSpeechField::Stats, StatusSpeechField::Favorited,
-                          StatusSpeechField::Boosted, StatusSpeechField::Visibility,
-                          StatusSpeechField::Source};
-    auto user_fields = {UserSpeechField::Author, UserSpeechField::Handle, UserSpeechField::Bot,
-                        UserSpeechField::Locked, UserSpeechField::Bio, UserSpeechField::Followers,
-                        UserSpeechField::Following, UserSpeechField::Posts};
-    auto notif_fields = {NotificationSpeechField::Actor, NotificationSpeechField::Action,
-                         NotificationSpeechField::Handle, NotificationSpeechField::Text,
-                         NotificationSpeechField::Time};
-    auto build = [](auto fields) {
+    // Straight from the enum. This list used to be written out by hand, and a
+    // field added to the core simply never appeared in the apps that build their
+    // picker from this catalog.
+    const auto& status_fields = status_field_catalog();
+    const auto& user_fields = user_field_catalog();
+    const auto& notif_fields = notification_field_catalog();
+    auto build = [](const auto& fields) {
         json arr = json::array();
         for (auto f : fields)
             arr.push_back({{"key", field_key(f)}, {"label", field_display_name(f)}});
@@ -4680,13 +4690,22 @@ void CoreSession::emit(const json& event) {
         emit_(event.dump());
 }
 
-void CoreSession::emit_settings() {
+void CoreSession::emit_settings(bool refresh_devices) {
     json packs = json::array();
     for (const auto& p : sound_.list_soundpacks())
         packs.push_back(p);
+    // The output devices earcons can play through, for the Sounds settings page.
+    // Media devices are enumerated by each app instead: they come from that
+    // platform's media framework, not from our mixer.
+    if (refresh_devices || sound_devices_.empty())
+        sound_devices_ = sound_.list_output_devices();
+    json devices = json::array();
+    for (const auto& d : sound_devices_)
+        devices.push_back(d);
     emit({{"event", "settings"},
           {"settings", store::settings_to_json(settings_)},
-          {"soundpacks", packs}});
+          {"soundpacks", packs},
+          {"sound_devices", std::move(devices)}});
 }
 
 void CoreSession::emit_account_settings() {

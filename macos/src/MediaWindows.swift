@@ -13,11 +13,12 @@ import AVKit
 /// Routes a media_open event to the right window (kept alive by the caller).
 @MainActor
 enum MediaPresenter {
-    static func open(_ media: MediaOpen, from parent: NSWindow?) -> NSWindowController? {
+    static func open(_ media: MediaOpen, from parent: NSWindow?,
+                     state: AppState? = nil) -> NSWindowController? {
         guard let url = URL(string: media.url) else { return nil }
         let controller: NSWindowController = media.kind == "image"
             ? ImageViewerWindowController(url: url, title: media.title)
-            : MediaPlayerWindowController(url: url, title: media.title)
+            : MediaPlayerWindowController(url: url, title: media.title, state: state)
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
         return controller
@@ -53,13 +54,33 @@ final class ImageViewerWindowController: NSWindowController {
     }
 }
 
+/// AVPlayerView with Up/Down bound to the volume, matching the Windows and Linux
+/// players (Left/Right stay AVPlayerView's own seek).
+@MainActor
+final class VolumeKeyPlayerView: AVPlayerView {
+    /// Called with the new level, 0-100, so it can be spoken and remembered.
+    var onVolume: ((Int) -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        let up = UInt16(126), down = UInt16(125)
+        guard event.keyCode == up || event.keyCode == down, let player else {
+            super.keyDown(with: event)
+            return
+        }
+        let level = Int((player.volume * 100).rounded()) + (event.keyCode == up ? 10 : -10)
+        let clamped = max(0, min(100, level))
+        player.volume = Float(clamped) / 100
+        onVolume?(clamped)
+    }
+}
+
 /// An audio/video player. AVPlayerView exposes play/pause/scrubbing to VoiceOver;
-/// Space also toggles playback.
+/// Space also toggles playback, and Up/Down change the volume.
 @MainActor
 final class MediaPlayerWindowController: NSWindowController, NSWindowDelegate {
     private let player: AVPlayer
 
-    init(url: URL, title: String) {
+    init(url: URL, title: String, state: AppState? = nil) {
         player = AVPlayer(url: url)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 420),
                               styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -68,10 +89,23 @@ final class MediaPlayerWindowController: NSWindowController, NSWindowDelegate {
         window.title = title.isEmpty ? "Media" : title
         window.delegate = self // so windowWillClose fires on ⌘W / the close button
 
-        let playerView = AVPlayerView()
+        // Start at the level and on the device the settings remember. An unknown
+        // device name (unplugged since) leaves playback on the system's output.
+        let volume = state?.settingsRaw["media_volume"] as? Int ?? 100
+        player.volume = Float(max(0, min(100, volume))) / 100
+        if let name = state?.settingsRaw["media_device"] as? String,
+           let uid = AudioDevices.uid(forName: name) {
+            player.audioOutputDeviceUniqueID = uid
+        }
+
+        let playerView = VolumeKeyPlayerView()
         playerView.player = player
         playerView.controlsStyle = .floating
         playerView.setAccessibilityLabel(title.isEmpty ? "Media player" : title)
+        playerView.onVolume = { [weak state] level in
+            state?.onAnnounce?("Volume \(level) percent")
+            state?.setMediaVolume(level) // the next thing you play starts here
+        }
         window.contentView = playerView
         window.center()
         player.play()

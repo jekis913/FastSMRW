@@ -138,7 +138,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate {
             }
         }
         state.onMediaOpen = { [weak self] media in
-            guard let self, let controller = MediaPresenter.open(media, from: self.window) else { return }
+            guard let self,
+                  let controller = MediaPresenter.open(media, from: self.window, state: state)
+            else { return }
             self.mediaControllers.removeAll { $0.window?.isVisible != true }
             self.mediaControllers.append(controller)
         }

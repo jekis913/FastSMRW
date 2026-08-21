@@ -81,6 +81,11 @@
 #define IDC_SET_VOLUME_LABEL 324
 #define IDC_SET_VOLUME      325
 #define IDC_SET_BOUNDARY    326
+// Audio page, added later (the 320s block was full).
+#define IDC_SET_MEDIA_VOLUME_LABEL 710
+#define IDC_SET_MEDIA_VOLUME       711
+#define IDC_SET_SOUND_DEVICE       712
+#define IDC_SET_MEDIA_DEVICE       713
 #define IDD_SET_SPEECH      330
 #define IDC_SET_SPEECH_LIST 331
 #define IDC_SET_SPEECH_UP   332

@@ -169,6 +169,7 @@ private:
     std::string current_account_;
     nlohmann::json settings_ = nlohmann::json::object();
     std::vector<std::string> soundpacks_;
+    std::vector<std::string> sound_devices_; // mixer output devices, from the settings event
     bool load_pending_ = false;
     bool updating_ = false; // suppress cursor-changed while (re)binding models
     std::string find_query_;

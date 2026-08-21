@@ -12,6 +12,13 @@ namespace fastsm::store {
 struct AppSettings {
     bool sounds_enabled = true;
     int sound_volume = 100;     // master earcon/soundpack volume, 0-100 percent
+    int media_volume = 100;     // audio-attachment playback volume, 0-100 percent
+    // Output devices, by the name the OS reports ("" = whichever device the
+    // system is using). Sound effects and media are chosen separately so a
+    // podcast can play on the speakers while earcons stay in the headset.
+    // Desktop only: iOS and Android route audio themselves.
+    std::string sound_device;   // earcons / soundpack
+    std::string media_device;   // audio attachments in the media player
     bool boundary_sound = true; // chime at the top/bottom of a timeline when navigating
     // Per-post navigation earcons: a short sound as you move onto a post carrying
     // each attribute. Each is independently toggleable (the Earcons settings).

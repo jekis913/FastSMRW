@@ -231,6 +231,8 @@ private:
     // with post_action_catalog().
     bool run_post_action(const std::string& key, const std::string& row);
     void cmd_get_layer_keymap();                        // layer bindings + activation combo
+    // {volume} 0-100: the media player's persisted playback level.
+    void cmd_set_media_volume(const nlohmann::json& cmd);
     void cmd_set_window_shown(const nlohmann::json& cmd); // persist window visibility
     void cmd_check_for_update(const nlohmann::json& cmd); // {silent} -> update_status event
     void cmd_download_update(const nlohmann::json& cmd);  // {url} -> update_ready/update_error
@@ -316,7 +318,10 @@ private:
 
     // Event builders.
     void emit(const nlohmann::json& event);
-    void emit_settings(); // settings + available soundpacks
+    // settings + available soundpacks + the mixer's output devices. Enumerating
+    // devices costs a few milliseconds, so callers on a repeatable path (holding
+    // the media player's volume key) pass false and reuse the cached list.
+    void emit_settings(bool refresh_devices = true);
     void emit_account_settings(); // focused account's handle + soundpack + pack list
     void emit_accounts();
     // The soundpack an account should sound in (its override, or the global default).
@@ -359,6 +364,9 @@ private:
 
     std::unique_ptr<net::IHttpClient> http_;
     sound::SoundManager sound_;
+    // The mixer's output devices as of the last enumeration, sent with every
+    // settings event. Empty means "not enumerated yet" (see emit_settings).
+    std::vector<std::string> sound_devices_;
     store::TimelineCache cache_;
     AccountStore accounts_;
     store::AppSettings settings_;

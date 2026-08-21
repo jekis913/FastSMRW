@@ -334,3 +334,102 @@ void test_post_links() {
     plain.url = "https://x.social/@me/9";
     CHECK_EQ(present::post_links(plain).size(), static_cast<size_t>(1));
 }
+
+// Issue 9: "Boosted by" only ever gave the display name. Some people want to
+// hear handles and nothing else, so the same fact is available as an @handle.
+void test_presenter_boosted_by_handle() {
+    using present::StatusSpeechField;
+    const std::int64_t now = 1000;
+    Status inner;
+    inner.account.display_name = "Alice";
+    inner.account.acct = "alice.example";
+    inner.text = "original";
+    Status boost;
+    boost.account.display_name = "Carol";
+    boost.account.acct = "carol.example";
+    boost.reblog = std::make_shared<Status>(inner);
+
+    const std::vector<present::SpeechItem<StatusSpeechField>> handle_only = {
+        {StatusSpeechField::BoostedByHandle}};
+    CHECK_EQ(present::accessibility_label(boost, now, handle_only),
+             std::string("@carol.example boosted"));
+    // The display-name field is untouched by the new one.
+    const std::vector<present::SpeechItem<StatusSpeechField>> name_only = {
+        {StatusSpeechField::BoostedBy}};
+    CHECK_EQ(present::accessibility_label(boost, now, name_only), std::string("Carol boosted"));
+
+    // A post that isn't a boost says neither.
+    CHECK_EQ(present::accessibility_label(inner, now, handle_only), std::string());
+    CHECK_EQ(present::accessibility_label(inner, now, name_only), std::string());
+}
+
+// Issue 10: paragraph breaks survived to the view-post dialog but were flattened
+// on their way to the clipboard. Speech still gets one line — a screen reader
+// row shouldn't sprout newlines.
+void test_presenter_copy_keeps_line_breaks() {
+    using present::StatusSpeechField;
+    const std::int64_t now = 1000;
+    const std::vector<present::SpeechItem<StatusSpeechField>> text_only = {
+        {StatusSpeechField::Text}};
+
+    // Mastodon: the breaks live in the source HTML, since Status::text was
+    // flattened when the post was parsed.
+    Status mastodon;
+    mastodon.account.acct = "alice.example";
+    mastodon.content = "<p>first para</p><p>second para</p>";
+    mastodon.text = "first para second para";
+    CHECK_EQ(present::accessibility_label(mastodon, now, text_only, /*keep_line_breaks=*/true),
+             std::string("first para\n\nsecond para"));
+    CHECK_EQ(present::accessibility_label(mastodon, now, text_only),
+             std::string("first para second para"));
+
+    // Bluesky: no HTML, and the text already carries real newlines.
+    Status bluesky;
+    bluesky.account.acct = "bob.example";
+    bluesky.text = "line one\nline two";
+    CHECK_EQ(present::accessibility_label(bluesky, now, text_only, /*keep_line_breaks=*/true),
+             std::string("line one\nline two"));
+    CHECK_EQ(present::accessibility_label(bluesky, now, text_only),
+             std::string("line one line two"));
+
+    // The copy template is the thing that asks for breaks.
+    auto fields = present::SpeechSettings::defaults();
+    present::SpeechConfig::set_current(fields);
+    CHECK(contains(present::copy_label(TimelineItem{mastodon}, now), "first para\n\nsecond para"));
+}
+
+// Issue 14: the view-post dialog never said whether a post was public, quiet
+// public, followers-only or a direct message.
+void test_presenter_post_info_visibility() {
+    const std::int64_t now = 1000;
+    Status s;
+    s.account.display_name = "Alice";
+    s.account.acct = "alice.example";
+    s.text = "hello";
+    s.created_at = now - 60;
+
+    s.visibility = Visibility::Unlisted;
+    CHECK(contains(present::post_info(s, now), "Quiet public"));
+    s.visibility = Visibility::Private;
+    CHECK(contains(present::post_info(s, now), "Followers"));
+    s.visibility = Visibility::Direct;
+    CHECK(contains(present::post_info(s, now), "Specific people"));
+    s.visibility = Visibility::Public;
+    CHECK(contains(present::post_info(s, now), "Public"));
+
+    // Bluesky carries no visibility; the line is left off rather than guessed at.
+    s.visibility.reset();
+    const std::string none = present::post_info(s, now);
+    CHECK(!contains(none, "Public"));
+    CHECK(contains(none, "hello")); // the rest of the dialog is unaffected
+
+    // A boost shows the boosted post's visibility, not the (absent) wrapper's.
+    Status inner = s;
+    inner.visibility = Visibility::Private;
+    Status boost;
+    boost.account.display_name = "Carol";
+    boost.account.acct = "carol.example";
+    boost.created_at = now;
+    boost.reblog = std::make_shared<Status>(inner);
+    CHECK(contains(present::post_info(boost, now), "Followers"));
+}

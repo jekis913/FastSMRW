@@ -28,4 +28,18 @@ inline std::string to_utf8(std::wstring_view s) {
     return o;
 }
 
+// Windows text controls and the clipboard expect CRLF; a lone LF shows up as a
+// box (or no break at all) in Notepad and friends. The core speaks LF, so
+// anything of its text headed for a control or the clipboard comes through here.
+inline std::wstring to_crlf(std::wstring_view s) {
+    std::wstring out;
+    out.reserve(s.size() + s.size() / 16);
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == L'\n' && (i == 0 || s[i - 1] != L'\r'))
+            out += L'\r';
+        out += s[i];
+    }
+    return out;
+}
+
 } // namespace fastsmui

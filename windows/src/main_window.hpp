@@ -220,6 +220,7 @@ private:
     HotkeyDriver hotkey_driver_;   // mode "hotkey" (RegisterHotKey)
     KeyhookDriver keyhook_driver_; // mode "keyhook" (WH_KEYBOARD_LL)
     std::unique_ptr<MediaPlayback> media_bg_; // windowless background audio playback
+    std::vector<std::string> sound_devices_;  // mixer output devices, from the settings event
     std::string invisible_mode_ = "off";
     bool installed_mode() const;            // installed.txt marker present (vs portable)
     std::string pending_update_url_;        // FastSMRW.zip URL from the last check

@@ -608,8 +608,17 @@ void MainWindow::ev_media_open(const json& e) {
         play_media_background(url, title);
         return;
     }
+    MediaPlayerOptions opts;
+    opts.device = settings_.value("media_device", std::string{});
+    opts.volume = settings_.value("media_volume", 100);
+    // Up/Down in the player move the same level the Sounds page shows, and it
+    // sticks: the core persists it and hands it back on the next settings event.
+    opts.on_volume = [this](int level) {
+        dispatch_cmd({{"cmd", "set_media_volume"}, {"volume", level}});
+    };
     const bool played = show_media_player(GTK_WINDOW(window_), title, url,
-                                          [this](const std::string& m) { announce(m); });
+                                          [this](const std::string& m) { announce(m); },
+                                          std::move(opts));
     if (!played) // couldn't render it (unsupported codec) -> system player
         open_url(url);
 }
@@ -617,6 +626,8 @@ void MainWindow::ev_media_open(const json& e) {
 void MainWindow::play_media_background(const std::string& url, const std::string& title) {
     if (!media_bg_)
         media_bg_ = std::make_unique<MediaPlayback>();
+    media_bg_->set_output_device(settings_.value("media_device", std::string{}));
+    media_bg_->set_volume(settings_.value("media_volume", 100));
     if (media_bg_->play(url)) {
         announce("Playing " + title);
         if (!media_bg_timer_)
@@ -1525,6 +1536,14 @@ void MainWindow::ev_settings(const json& e) {
     soundpacks_.clear();
     for (const auto& p : e.value("soundpacks", json::array()))
         soundpacks_.push_back(p.get<std::string>());
+    sound_devices_.clear();
+    for (const auto& d : e.value("sound_devices", json::array()))
+        sound_devices_.push_back(d.get<std::string>());
+    // A media volume change while something is already playing in the background
+    // should be heard now, not next time. (The device only applies to a new
+    // stream — it's chosen when the graph is built.)
+    if (media_bg_)
+        media_bg_->set_volume(settings_.value("media_volume", 100));
     apply_invisible();
     if (action_catalog_.empty()) // load once so the Keyboard Manager has its actions
         dispatch_cmd({{"cmd", "get_action_catalog"}});
@@ -1532,7 +1551,11 @@ void MainWindow::ev_settings(const json& e) {
 
 void MainWindow::do_settings() {
     auto s = fastsm::store::settings_from_json(settings_);
-    if (auto result = show_settings_dialog(GTK_WINDOW(window_), std::move(s), soundpacks_))
+    AudioChoices audio;
+    audio.soundpacks = soundpacks_;
+    audio.sound_devices = sound_devices_;      // the core's mixer devices
+    audio.media_devices = media_output_devices(); // GStreamer's, which can differ
+    if (auto result = show_settings_dialog(GTK_WINDOW(window_), std::move(s), audio))
         dispatch_cmd(
             {{"cmd", "update_settings"}, {"settings", fastsm::store::settings_to_json(*result)}});
 }

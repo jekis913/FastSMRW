@@ -36,13 +36,24 @@ std::string apply_emoji(std::string s, EmojiRemoval mode) {
     return s;
 }
 
-// A post body, cleaned for display/speech: single line, collapsed leading
-// @mention run, and emoji stripped per settings.
-std::string present_text(const std::string& raw) {
+// A post body, cleaned for display/speech: collapsed leading @mention run and
+// emoji stripped per settings. Flattened to a single line unless the caller
+// wants the author's own paragraph breaks (copying to the clipboard).
+std::string present_text(const std::string& raw, bool keep_breaks = false) {
     const TextPresentation& t = TextConfig::current();
-    std::string s = one_line(raw);
+    std::string s = keep_breaks ? raw : one_line(raw);
     s = util::truncate_leading_mentions(s, t.max_mentions);
     return apply_emoji(std::move(s), t.post_emoji);
+}
+
+// The post's text, with its line breaks intact when asked for. Status::text was
+// flattened when the post was parsed, so recovering the breaks means going back
+// to the source HTML; Bluesky posts have no HTML and already carry real
+// newlines in their text.
+std::string body_source(const Status& d, bool keep_breaks) {
+    if (!keep_breaks || d.content.empty())
+        return d.text;
+    return util::strip_html(d.content, /*keep_breaks=*/true);
 }
 
 // A display name, cleaned for display/speech: emoji stripped per settings.
@@ -175,11 +186,17 @@ std::string compact_line(const Status& s, std::int64_t now) {
 }
 
 std::optional<std::string> status_field_string(StatusSpeechField field, const Status& s,
-                                               std::int64_t now) {
+                                               std::int64_t now, bool keep_breaks) {
     const Status& d = s.display_status();
     switch (field) {
     case StatusSpeechField::BoostedBy:
         return s.is_boost() ? std::optional(display_name_for(s.account) + " boosted") : std::nullopt;
+    case StatusSpeechField::BoostedByHandle:
+        // The same thing said with the @handle instead of the display name, for
+        // people who only ever want handles.
+        return s.is_boost() && !s.account.acct.empty()
+                   ? std::optional("@" + s.account.acct + " boosted")
+                   : std::nullopt;
     case StatusSpeechField::Author:
         return display_name_for(d.account);
     case StatusSpeechField::Handle:
@@ -189,14 +206,17 @@ std::optional<std::string> status_field_string(StatusSpeechField field, const St
         return (d.has_content_warning() && TextConfig::current().cw != CwMode::Ignore)
                    ? std::optional("Content warning: " + *d.spoiler_text)
                    : std::nullopt;
-    case StatusSpeechField::Text:
+    case StatusSpeechField::Text: {
         // "Hide" mode hides the body behind the warning.
         if (d.has_content_warning() && TextConfig::current().cw == CwMode::Hide)
             return std::nullopt;
-        return d.text.empty() ? std::nullopt : std::optional(present_text(d.text));
+        const std::string body = body_source(d, keep_breaks);
+        return body.empty() ? std::nullopt : std::optional(present_text(body, keep_breaks));
+    }
     case StatusSpeechField::Quote:
-        return d.quote ? std::optional("Quoting " + display_name_for(d.quote->account) +
-                                       ": " + present_text(d.quote->text))
+        return d.quote ? std::optional("Quoting " + display_name_for(d.quote->account) + ": " +
+                                       present_text(body_source(*d.quote, keep_breaks),
+                                                    keep_breaks))
                        : std::nullopt;
     case StatusSpeechField::Media:
         return d.media_attachments.empty() ? std::nullopt
@@ -225,6 +245,18 @@ std::optional<std::string> status_field_string(StatusSpeechField field, const St
         return d.reply_to_handle && !d.reply_to_handle->empty()
                    ? std::optional("Replying to @" + *d.reply_to_handle)
                    : std::optional<std::string>("Reply");
+    case StatusSpeechField::ReplyingToText:
+        // What the reply is answering, when the Bluesky feed embedded the parent
+        // post. Nothing to say when it didn't (a blocked or deleted parent).
+        if (!d.reply_to_text || d.reply_to_text->empty())
+            return std::nullopt;
+        return present_text(*d.reply_to_text, keep_breaks);
+    case StatusSpeechField::Thread:
+        // A post is in a thread if it answers something or has been answered —
+        // either way, Open Thread has more to show than this one post.
+        return d.in_reply_to_id || d.replies_count > 0
+                   ? std::optional<std::string>("Thread")
+                   : std::nullopt;
     }
     return std::nullopt;
 }
@@ -242,9 +274,11 @@ void collect_filter_titles(const Status& s, std::vector<std::string>& out) {
 } // namespace
 
 std::string accessibility_label(const Status& s, std::int64_t now,
-                                const std::vector<SpeechItem<StatusSpeechField>>& fields) {
-    std::string label = compose_fields(
-        fields, [&](StatusSpeechField f) { return status_field_string(f, s, now); });
+                                const std::vector<SpeechItem<StatusSpeechField>>& fields,
+                                bool keep_line_breaks) {
+    std::string label = compose_fields(fields, [&](StatusSpeechField f) {
+        return status_field_string(f, s, now, keep_line_breaks);
+    });
     std::vector<std::string> titles;
     collect_filter_titles(s, titles);
     if (!titles.empty()) {
@@ -358,8 +392,10 @@ std::string accessibility_label(const Notification& n, std::int64_t now) {
 
 std::string copy_label(const TimelineItem& item, std::int64_t now) {
     const SpeechSettings& cfg = SpeechConfig::current();
+    // Copying is the one place a post keeps the line breaks its author wrote:
+    // the clipboard is where they still mean something (issue #10).
     if (const Status* s = std::get_if<Status>(&item.value))
-        return accessibility_label(*s, now, cfg.copy_status);
+        return accessibility_label(*s, now, cfg.copy_status, /*keep_line_breaks=*/true);
     if (const Notification* n = std::get_if<Notification>(&item.value))
         return accessibility_label(*n, now, cfg.copy_notification);
     if (const User* u = std::get_if<User>(&item.value))
@@ -601,9 +637,15 @@ static std::string detail_body(const Status& s) {
 }
 
 std::string post_info(const Status& s, std::int64_t now) {
+    const Status& d = s.display_status();
     std::string out;
     out += display_name_for(s.account) + " (@" + s.account.acct + ")\n";
-    out += present_time(s.created_at, now, true) + "\n";
+    out += present_time(s.created_at, now, true);
+    // Who the post went out to. Mastodon-only: Bluesky posts are all public, so
+    // it carries no visibility and the line is simply left off.
+    if (d.visibility)
+        out += " \xC2\xB7 " + visibility_name(*d.visibility); // " · "
+    out += "\n";
     if (s.has_content_warning())
         out += "Content warning: " + *s.spoiler_text + "\n";
     out += "\n" + detail_body(s) + "\n";

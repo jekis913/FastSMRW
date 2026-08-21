@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include "fastsm/platform/bluesky/bluesky_map.hpp"
+#include "fastsm/presentation/status_presenter.hpp"
 
 using namespace fastsm;
 using nlohmann::json;
@@ -37,7 +38,8 @@ static const char* kFeedItem = R"JSON({
     "parent": {
       "author": {
         "did": "did:plc:other", "handle": "other.bsky.social", "viewer": {}
-      }
+      },
+      "record": { "$type": "app.bsky.feed.post", "text": "what do you think?" }
     }
   }
 })JSON";
@@ -67,6 +69,8 @@ void test_bluesky_feed_mapping() {
     CHECK_EQ(inner.reply_to_handle.value(), std::string("other.bsky.social"));
     CHECK(inner.reply_to_author_followed.has_value());
     CHECK(!*inner.reply_to_author_followed);
+    // The parent post's own words, for the "Replied-to post text" speech field.
+    CHECK_EQ(inner.reply_to_text.value(), std::string("what do you think?"));
     CHECK_EQ(inner.media_attachments.size(), size_t(1));
     CHECK(inner.media_attachments[0].type == MediaAttachment::Kind::Image);
     CHECK_EQ(inner.media_attachments[0].description, std::string("a view"));
@@ -81,6 +85,46 @@ void test_bluesky_feed_mapping() {
     unknown_item["reply"]["parent"]["author"].erase("viewer");
     const Status unknown = bluesky::map_feed_item(unknown_item);
     CHECK(!unknown.display_status().reply_to_author_followed.has_value());
+
+    // A blocked or deleted parent is a stub view with no record: nothing to read
+    // out, and nothing that should look like the reply's own text.
+    json blocked_item = json::parse(kFeedItem);
+    blocked_item["reply"]["parent"].erase("record");
+    const Status blocked = bluesky::map_feed_item(blocked_item);
+    CHECK(!blocked.display_status().reply_to_text.has_value());
+}
+
+// The replied-to text is spoken when the field is on, and skipped entirely when
+// the feed didn't carry the parent post.
+void test_bluesky_replied_to_text_field() {
+    using fastsm::present::StatusSpeechField;
+    const std::vector<fastsm::present::SpeechItem<StatusSpeechField>> only_parent = {
+        {StatusSpeechField::ReplyingToText}};
+
+    const Status s = bluesky::map_feed_item(json::parse(kFeedItem));
+    CHECK_EQ(fastsm::present::accessibility_label(s, 0, only_parent),
+             std::string("what do you think?"));
+
+    // The row is a repost, so the reply data hangs off the boosted post.
+    Status no_parent = s;
+    no_parent.reblog = std::make_shared<Status>(*s.reblog);
+    no_parent.reblog->reply_to_text.reset();
+    CHECK_EQ(fastsm::present::accessibility_label(no_parent, 0, only_parent), std::string());
+
+    // The thread indicator: this post is a reply, so it's in a conversation.
+    const std::vector<fastsm::present::SpeechItem<StatusSpeechField>> only_thread = {
+        {StatusSpeechField::Thread}};
+    CHECK_EQ(fastsm::present::accessibility_label(s, 0, only_thread), std::string("Thread"));
+
+    // A standalone post — no parent, no replies — says nothing.
+    Status alone = *s.reblog;
+    alone.in_reply_to_id.reset();
+    alone.replies_count = 0;
+    CHECK_EQ(fastsm::present::accessibility_label(alone, 0, only_thread), std::string());
+
+    // Having been replied to is enough on its own.
+    alone.replies_count = 3;
+    CHECK_EQ(fastsm::present::accessibility_label(alone, 0, only_thread), std::string("Thread"));
 }
 
 void test_bluesky_notification_mapping() {

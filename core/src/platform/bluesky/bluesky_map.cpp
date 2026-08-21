@@ -278,7 +278,7 @@ Status map_feed_item(const json& item) {
     // viewer relationship), so capture everything needed by reply presentation
     // and client filtering here without making another request.
     if (const json* reply = obj(item, "reply"))
-        if (const json* parent = obj(*reply, "parent"))
+        if (const json* parent = obj(*reply, "parent")) {
             if (const json* author = obj(*parent, "author")) {
                 if (std::string did = str(*author, "did"); !did.empty())
                     inner.reply_to_author_id = did;
@@ -287,6 +287,12 @@ Status map_feed_item(const json& item) {
                 if (const json* viewer = obj(*author, "viewer"))
                     inner.reply_to_author_followed = !str(*viewer, "following").empty();
             }
+            // The parent's own words. Absent when the parent is blocked, deleted
+            // or otherwise "not found" — those views carry no record at all.
+            if (const json* record = obj(*parent, "record"))
+                if (std::string t = str(*record, "text"); !t.empty())
+                    inner.reply_to_text = t;
+        }
 
     // A repost "reason" turns the row into a boost authored by the reposter.
     if (const json* reason = obj(item, "reason")) {

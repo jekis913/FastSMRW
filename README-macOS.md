@@ -185,8 +185,9 @@ versions of FastSM:
 - Timelines — cache limit, auto-refresh interval, live streaming, showing
   mentions in Notifications, reverse order, auto-loading older posts, syncing
   your Home position (Mastodon), and the movement units.
-- Audio — play sounds, the top/bottom boundary sound, soundpack, and volume,
-  plus a button to open the soundpacks folder.
+- Audio — play sounds, the top/bottom boundary sound, soundpack, sound effect
+  and media volume, which output device each of those plays through, plus a
+  button to open the soundpacks folder.
 - Earcons — per-type sounds for images, media, mentions, pinned posts, and
   polls.
 - Speech — content-warning handling, emoji in posts and names, how many

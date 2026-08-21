@@ -30,6 +30,9 @@ final class AppState {
     /// missing key, so we must always send the whole object.
     private(set) var settingsRaw: [String: Any] = [:]
     private(set) var soundpacks: [String] = []
+    /// Output devices the core's mixer can play sound effects through (desktop
+    /// settings; iOS routes audio itself and ignores this).
+    private(set) var soundDevices: [String] = []
     private(set) var speechCatalog: SpeechCatalog?
 
     // UI subscriptions (set by the controllers).
@@ -127,6 +130,7 @@ final class AppState {
            obj["event"] as? String == "settings" {
             if let s = obj["settings"] as? [String: Any] { settingsRaw = s }
             if let packs = obj["soundpacks"] as? [String] { soundpacks = packs }
+            if let devices = obj["sound_devices"] as? [String] { soundDevices = devices }
             onSettings?()
             // One silent update check at startup, once settings say it's wanted.
             // iOS has no update flow at all (TestFlight / the App Store owns
@@ -289,6 +293,11 @@ final class AppState {
         mutate(&s)
         settingsRaw = s
         client.send("update_settings", ["settings": s])
+    }
+    /// The media player's volume keys and the Sounds settings slider set the same
+    /// persisted level; the core saves it and echoes it back in a settings event.
+    func setMediaVolume(_ percent: Int) {
+        client.send("set_media_volume", ["volume": max(0, min(100, percent))])
     }
     func selectTimeline(dir: String) { client.send("select_timeline", ["dir": dir]) }
     func selectTimeline(number: Int) { client.send("select_timeline", ["number": number]) }

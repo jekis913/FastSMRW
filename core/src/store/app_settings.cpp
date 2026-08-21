@@ -82,6 +82,9 @@ AppSettings settings_from_json(const json& root) {
     AppSettings settings;
     settings.sounds_enabled = root.value("sounds_enabled", true);
     settings.sound_volume = root.value("sound_volume", 100);
+    settings.media_volume = root.value("media_volume", 100);
+    settings.sound_device = root.value("sound_device", std::string{});
+    settings.media_device = root.value("media_device", std::string{});
     settings.boundary_sound = root.value("boundary_sound", true);
     settings.earcon_image = root.value("earcon_image", true);
     settings.earcon_media = root.value("earcon_media", true);
@@ -204,6 +207,9 @@ json settings_to_json(const AppSettings& settings) {
     json root;
     root["sounds_enabled"] = settings.sounds_enabled;
     root["sound_volume"] = settings.sound_volume;
+    root["media_volume"] = settings.media_volume;
+    root["sound_device"] = settings.sound_device;
+    root["media_device"] = settings.media_device;
     root["boundary_sound"] = settings.boundary_sound;
     root["earcon_image"] = settings.earcon_image;
     root["earcon_media"] = settings.earcon_media;

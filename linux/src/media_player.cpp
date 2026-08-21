@@ -6,10 +6,74 @@
 
 namespace fastsmgtk {
 
+namespace {
+
+// GStreamer has to be up before anything (including enumerating devices) works.
+void ensure_gst_init() {
+    static bool inited = false;
+    if (!inited) {
+        gst_init(nullptr, nullptr);
+        inited = true;
+    }
+}
+
+// Hands each audio output GStreamer can see to `visit`, along with its display
+// name; returning true stops the walk. The monitor is torn down either way.
+template <class Visit> void enum_audio_sinks(Visit visit) {
+    ensure_gst_init();
+    GstDeviceMonitor* monitor = gst_device_monitor_new();
+    if (!monitor)
+        return;
+    gst_device_monitor_add_filter(monitor, "Audio/Sink", nullptr);
+    gst_device_monitor_start(monitor);
+    GList* devices = gst_device_monitor_get_devices(monitor);
+    for (GList* l = devices; l; l = l->next) {
+        GstDevice* device = GST_DEVICE(l->data);
+        gchar* name = gst_device_get_display_name(device);
+        const bool stop = name && *name && visit(std::string(name), device);
+        g_free(name);
+        if (stop)
+            break;
+    }
+    g_list_free_full(devices, gst_object_unref);
+    gst_device_monitor_stop(monitor);
+    gst_object_unref(monitor);
+}
+
+} // namespace
+
+std::vector<std::string> media_output_devices() {
+    std::vector<std::string> names;
+    enum_audio_sinks([&](const std::string& name, GstDevice*) {
+        // Two devices can share a display name (the same card through different
+        // profiles); one entry per name is all the user can pick from.
+        if (std::find(names.begin(), names.end(), name) == names.end())
+            names.push_back(name);
+        return false; // keep walking
+    });
+    return names;
+}
+
 struct MediaPlayback::Impl {
     GstElement* playbin = nullptr;
     bool done = false;
     int volume = 100;
+    std::string device; // "" = the system's own output device
+
+    // Point playbin at the chosen device by giving it that device's own sink
+    // element. No match (unplugged, renamed) leaves playbin to its default sink
+    // rather than failing to play.
+    void apply_device() {
+        if (device.empty() || !playbin)
+            return;
+        enum_audio_sinks([&](const std::string& name, GstDevice* dev) {
+            if (name != device)
+                return false;
+            if (GstElement* sink = gst_device_create_element(dev, nullptr))
+                g_object_set(playbin, "audio-sink", sink, nullptr); // playbin takes it
+            return true;
+        });
+    }
 
     // Drain the bus; EOS or an error (bad codec, dead stream) marks us done.
     void poll_bus() {
@@ -25,13 +89,7 @@ struct MediaPlayback::Impl {
     }
 };
 
-MediaPlayback::MediaPlayback() : impl_(new Impl) {
-    static bool inited = false;
-    if (!inited) {
-        gst_init(nullptr, nullptr);
-        inited = true;
-    }
-}
+MediaPlayback::MediaPlayback() : impl_(new Impl) { ensure_gst_init(); }
 
 MediaPlayback::~MediaPlayback() {
     stop();
@@ -45,6 +103,7 @@ bool MediaPlayback::play(const std::string& url) {
     if (!impl_->playbin)
         return false;
     g_object_set(impl_->playbin, "uri", url.c_str(), nullptr);
+    impl_->apply_device(); // before PLAYING, while the sink can still be swapped
     g_object_set(impl_->playbin, "volume", impl_->volume / 100.0, nullptr);
     if (gst_element_set_state(impl_->playbin, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
         stop();
@@ -78,11 +137,18 @@ void MediaPlayback::seek(double delta_seconds) {
                             target);
 }
 
-void MediaPlayback::adjust_volume(int delta_pct) {
-    impl_->volume = std::clamp(impl_->volume + delta_pct, 0, 100);
-    if (impl_->playbin)
+void MediaPlayback::set_volume(int pct) {
+    impl_->volume = std::clamp(pct, 0, 100);
+    if (impl_->playbin) // playbin's volume is a straight amplitude ratio
         g_object_set(impl_->playbin, "volume", impl_->volume / 100.0, nullptr);
 }
+
+int MediaPlayback::adjust_volume(int delta_pct) {
+    set_volume(impl_->volume + delta_pct);
+    return impl_->volume;
+}
+
+void MediaPlayback::set_output_device(std::string name) { impl_->device = std::move(name); }
 
 bool MediaPlayback::toggle_pause() {
     if (!impl_->playbin)
@@ -108,14 +174,18 @@ struct PlayerCtx {
     MediaPlayback* player = nullptr;
     std::function<void(const std::string&)>* speak = nullptr;
     GtkWidget* dialog = nullptr;
+    std::function<void(int)>* on_volume = nullptr; // remember the level chosen
 };
 PlayerCtx player_ctx;
 
 } // namespace
 
 bool show_media_player(GtkWindow* parent, const std::string& title, const std::string& url,
-                       std::function<void(const std::string&)> speak) {
+                       std::function<void(const std::string&)> speak,
+                       MediaPlayerOptions options) {
     MediaPlayback player;
+    player.set_output_device(std::move(options.device));
+    player.set_volume(options.volume);
     if (!player.play(url))
         return false;
 
@@ -132,7 +202,7 @@ bool show_media_player(GtkWindow* parent, const std::string& title, const std::s
     gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), label, TRUE,
                        TRUE, 0);
 
-    player_ctx = {&player, &speak, dialog};
+    player_ctx = {&player, &speak, dialog, &options.on_volume};
     g_signal_connect(
         dialog, "key-press-event",
         G_CALLBACK(+[](GtkWidget*, GdkEventKey* event, gpointer) -> gboolean {
@@ -147,15 +217,16 @@ bool show_media_player(GtkWindow* parent, const std::string& title, const std::s
                 player_ctx.player->seek(5);
                 return TRUE;
             case GDK_KEY_Up:
-                player_ctx.player->adjust_volume(5);
-                (*player_ctx.speak)(std::to_string(player_ctx.player->volume_pct()) +
-                                    " percent");
+            case GDK_KEY_Down: {
+                // Same step as the Windows player, so the shared saved level moves
+                // the same way whichever app you set it from.
+                const int level =
+                    player_ctx.player->adjust_volume(event->keyval == GDK_KEY_Up ? 10 : -10);
+                if (player_ctx.on_volume && *player_ctx.on_volume)
+                    (*player_ctx.on_volume)(level); // persist for the next thing you play
+                (*player_ctx.speak)("Volume " + std::to_string(level) + " percent");
                 return TRUE;
-            case GDK_KEY_Down:
-                player_ctx.player->adjust_volume(-5);
-                (*player_ctx.speak)(std::to_string(player_ctx.player->volume_pct()) +
-                                    " percent");
-                return TRUE;
+            }
             default:
                 return FALSE;
             }

@@ -26,10 +26,43 @@ namespace {
 
 struct Ctx {
     AppSettings settings;
-    std::vector<std::string> soundpacks;
+    AudioChoices audio;
     std::function<void(HWND)> open_manager;
     bool applied = false;
 };
+
+// Fills an output-device combo: "System default" first (the empty setting),
+// then the devices. A saved device that isn't present right now is kept as an
+// extra entry, so opening Settings while the headset is unplugged doesn't
+// quietly reset the choice to default.
+void fill_device_combo(HWND dlg, int id, const std::vector<std::string>& devices,
+                       const std::string& current, std::vector<std::string>& values) {
+    HWND combo = GetDlgItem(dlg, id);
+    values.assign(1, std::string{}); // index 0 = system default
+    SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"System default"));
+    int sel = 0;
+    for (const auto& d : devices) {
+        values.push_back(d);
+        SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(to_wide(d).c_str()));
+        if (d == current)
+            sel = static_cast<int>(values.size()) - 1;
+    }
+    if (!current.empty() && sel == 0) {
+        values.push_back(current); // the real name; the row just reads differently
+        SendMessageW(combo, CB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(to_wide(current + " (not connected)").c_str()));
+        sel = static_cast<int>(values.size()) - 1;
+    }
+    SendMessageW(combo, CB_SETCURSEL, sel, 0);
+}
+
+// Reads back what fill_device_combo put in ("" for System default).
+std::string read_device_combo(HWND dlg, int id, const std::vector<std::string>& values) {
+    const int sel = static_cast<int>(SendDlgItemMessageW(dlg, id, CB_GETCURSEL, 0, 0));
+    if (sel <= 0 || sel >= static_cast<int>(values.size()))
+        return {};
+    return values[static_cast<size_t>(sel)];
+}
 
 Ctx* ctx_of(HWND dlg) { return reinterpret_cast<Ctx*>(GetWindowLongPtrW(dlg, DWLP_USER)); }
 
@@ -191,6 +224,11 @@ INT_PTR CALLBACK TimelinesProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     return FALSE;
 }
 
+// The device names behind each combo's rows, parallel to the visible items.
+// Page-local: the Audio page is built once per Settings run.
+std::vector<std::string> g_sound_device_values;
+std::vector<std::string> g_media_device_values;
+
 INT_PTR CALLBACK AudioProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_INITDIALOG: {
@@ -199,16 +237,23 @@ INT_PTR CALLBACK AudioProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         checked(dlg, IDC_SET_BOUNDARY, ctx->settings.boundary_sound);
         HWND combo = GetDlgItem(dlg, IDC_SET_SOUNDPACK);
         int sel = 0;
-        for (size_t i = 0; i < ctx->soundpacks.size(); ++i) {
+        for (size_t i = 0; i < ctx->audio.soundpacks.size(); ++i) {
             SendMessageW(combo, CB_ADDSTRING, 0,
-                         reinterpret_cast<LPARAM>(to_wide(ctx->soundpacks[i]).c_str()));
-            if (ctx->soundpacks[i] == ctx->settings.soundpack)
+                         reinterpret_cast<LPARAM>(to_wide(ctx->audio.soundpacks[i]).c_str()));
+            if (ctx->audio.soundpacks[i] == ctx->settings.soundpack)
                 sel = static_cast<int>(i);
         }
         SendMessageW(combo, CB_SETCURSEL, sel, 0);
         HWND vol = GetDlgItem(dlg, IDC_SET_VOLUME);
         SendMessageW(vol, TBM_SETRANGE, TRUE, MAKELONG(0, 100));
         SendMessageW(vol, TBM_SETPOS, TRUE, std::clamp(ctx->settings.sound_volume, 0, 100));
+        HWND media_vol = GetDlgItem(dlg, IDC_SET_MEDIA_VOLUME);
+        SendMessageW(media_vol, TBM_SETRANGE, TRUE, MAKELONG(0, 100));
+        SendMessageW(media_vol, TBM_SETPOS, TRUE, std::clamp(ctx->settings.media_volume, 0, 100));
+        fill_device_combo(dlg, IDC_SET_SOUND_DEVICE, ctx->audio.sound_devices,
+                          ctx->settings.sound_device, g_sound_device_values);
+        fill_device_combo(dlg, IDC_SET_MEDIA_DEVICE, ctx->audio.media_devices,
+                          ctx->settings.media_device, g_media_device_values);
         return TRUE;
     }
     case WM_COMMAND:
@@ -225,10 +270,16 @@ INT_PTR CALLBACK AudioProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             ctx->settings.boundary_sound = is_checked(dlg, IDC_SET_BOUNDARY);
             ctx->settings.sound_volume =
                 static_cast<int>(SendDlgItemMessageW(dlg, IDC_SET_VOLUME, TBM_GETPOS, 0, 0));
+            ctx->settings.media_volume = static_cast<int>(
+                SendDlgItemMessageW(dlg, IDC_SET_MEDIA_VOLUME, TBM_GETPOS, 0, 0));
+            ctx->settings.sound_device =
+                read_device_combo(dlg, IDC_SET_SOUND_DEVICE, g_sound_device_values);
+            ctx->settings.media_device =
+                read_device_combo(dlg, IDC_SET_MEDIA_DEVICE, g_media_device_values);
             const int sel = static_cast<int>(
                 SendDlgItemMessageW(dlg, IDC_SET_SOUNDPACK, CB_GETCURSEL, 0, 0));
-            if (sel >= 0 && sel < static_cast<int>(ctx->soundpacks.size()))
-                ctx->settings.soundpack = ctx->soundpacks[static_cast<size_t>(sel)];
+            if (sel >= 0 && sel < static_cast<int>(ctx->audio.soundpacks.size()))
+                ctx->settings.soundpack = ctx->audio.soundpacks[static_cast<size_t>(sel)];
             ctx->applied = true;
             SetWindowLongPtrW(dlg, DWLP_MSGRESULT, PSNRET_NOERROR);
             return TRUE;
@@ -857,11 +908,11 @@ PROPSHEETPAGEW make_page(HINSTANCE inst, int dlg, DLGPROC proc, Ctx* ctx) {
 
 std::optional<AppSettings> show_settings_dialog(HWND parent, HINSTANCE inst,
                                                 const AppSettings& current,
-                                                const std::vector<std::string>& soundpacks,
+                                                const AudioChoices& audio,
                                                 std::function<void(HWND)> open_manager) {
     Ctx ctx;
     ctx.settings = current;
-    ctx.soundpacks = soundpacks;
+    ctx.audio = audio;
     ctx.open_manager = std::move(open_manager);
 
     PROPSHEETPAGEW pages[] = {

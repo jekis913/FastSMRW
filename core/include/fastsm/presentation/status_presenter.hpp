@@ -19,13 +19,16 @@ std::string compact_line(const Status& s, std::int64_t now);
 std::string compact_line(const TimelineItem& item, std::int64_t now);
 
 // The string for one speech field, or nullopt if it shouldn't be spoken.
+// `keep_line_breaks` preserves the paragraph breaks the author wrote instead of
+// flattening the body to one line — wanted when copying, not when speaking.
 std::optional<std::string> status_field_string(StatusSpeechField field, const Status& s,
-                                               std::int64_t now);
+                                               std::int64_t now, bool keep_line_breaks = false);
 
 // Rich comma-separated label spoken by the screen reader, built from the given
 // ordered/toggled fields (defaults to the current SpeechConfig).
 std::string accessibility_label(const Status& s, std::int64_t now,
-                                const std::vector<SpeechItem<StatusSpeechField>>& fields);
+                                const std::vector<SpeechItem<StatusSpeechField>>& fields,
+                                bool keep_line_breaks = false);
 std::string accessibility_label(const Status& s, std::int64_t now);
 std::string accessibility_label(const TimelineItem& item, std::int64_t now);
 // Configurable spoken labels for a user row / a notification (SpeechConfig).
