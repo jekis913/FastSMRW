@@ -1,0 +1,42 @@
+# APIs that do not exist on Windows 7. FastSMRW targets Windows 7+, so none of
+# these may appear in FastSMRW.exe's import table - a static import makes the
+# app die at startup with "The procedure entry point X could not be located",
+# before any of our code runs. Load such APIs with GetProcAddress instead.
+#
+# build.bat checks the linked exe against this list. Add a name here whenever
+# a new toolset or SDK starts binding something newer.
+#
+# Lines starting with # are comments; one API name per line.
+
+# --- Windows 8 ---
+# MSVC 14.51 (Visual Studio 2026) dropped Windows 7 from its prebuilt CRT and
+# STL, so these two get bound by <chrono> and <filesystem> with no say from us.
+GetSystemTimePreciseAsFileTime
+CreateFile2
+WaitOnAddress
+WakeByAddressSingle
+WakeByAddressAll
+DiscardVirtualMemory
+OfferVirtualMemory
+SetProcessMitigationPolicy
+PathCchCanonicalizeEx
+PathCchCombineEx
+
+# --- Windows 8.1 (SHCORE.dll does not exist on Windows 7 at all) ---
+GetDpiForMonitor
+SetProcessDpiAwareness
+
+# --- Windows 10 ---
+GetDpiForWindow
+GetDpiForSystem
+GetSystemMetricsForDpi
+AdjustWindowRectExForDpi
+SystemParametersInfoForDpi
+EnableNonClientDpiScaling
+SetProcessDpiAwarenessContext
+SetThreadDpiAwarenessContext
+AreDpiAwarenessContextsEqual
+SetThreadDescription
+GetThreadDescription
+GetTempPath2W
+GetTempPath2A

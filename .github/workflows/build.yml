@@ -13,7 +13,15 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # Pinned, NOT windows-latest: that label moved to a Visual Studio 2026 image,
+    # whose MSVC 14.51 dropped Windows 7 from its prebuilt CRT/STL. Builds from it
+    # statically import Win8-only APIs and won't start on Windows 7, which we
+    # support. windows-2022 carries VS 2022 (toolset 14.44), the last Win7-capable
+    # one. FASTSM_STRICT_WIN7 makes build.bat fail rather than ship a broken exe if
+    # this image ever moves too.
+    runs-on: windows-2022
+    env:
+      FASTSM_STRICT_WIN7: 1
     steps:
       - uses: actions/checkout@v4
 

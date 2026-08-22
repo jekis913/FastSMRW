@@ -13,6 +13,7 @@ FastSMRW changelog
 - Fixed: copying a post to the clipboard keeps the line breaks its author wrote, instead of running the paragraphs together.
 - Fixed: on Linux, FastSM no longer closes itself moments after starting when the invisible interface is turned on, and the Keyboard Manager no longer closes it when you pick a keymap.
 - Fixed: on Linux, looking at another keymap in the Keyboard Manager no longer takes over the hotkeys you actually have active, matching Windows.
+- Fixed: FastSM starts again on Windows 7 — downloaded builds since 0.5.0 refused to open with an "entry point not found" error.
 
 0.5.4
 -----

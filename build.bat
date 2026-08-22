@@ -144,6 +144,31 @@ set "APP_SRC=windows\src\main.cpp windows\src\main_window.cpp windows\src\compos
 cl %CFLAGS% %USPEECH_DEF% %COREINC% /I windows\src %USPEECH_INC% %APP_SRC% "%BUILD%\fastsm_core.lib" "%BUILD%\app.res" /Fo"%OBJ%\app\\" /Fe"%BUILD%\FastSMRW.exe" /link %LINKFLAGS% user32.lib gdi32.lib comctl32.lib comdlg32.lib shell32.lib winhttp.lib crypt32.lib ole32.lib oleaut32.lib winmm.lib strmiids.lib %USPEECH_LIB%
 if errorlevel 1 goto error
 
+REM ---- 2a) Windows 7 floor: the exe must not statically import a newer API ----
+REM MSVC 14.51 (Visual Studio 2026) dropped Windows 7 from its prebuilt CRT and
+REM STL, so <chrono> and <filesystem> bind GetSystemTimePreciseAsFileTime and
+REM CreateFile2 with no say from our own code, and the app then dies on Win7 at
+REM startup with "entry point not found". Check the linked binary rather than
+REM trust the toolset. A local build only warns; CI sets FASTSM_STRICT_WIN7 so a
+REM binary that can't run on Win7 never reaches a release.
+echo Checking the Windows 7 import floor...
+dumpbin /nologo /imports "%BUILD%\FastSMRW.exe" > "%BUILD%\imports.txt"
+set "WIN7_BAD="
+for /f "usebackq eol=# tokens=1" %%a in ("tools\win7_banned_imports.txt") do (
+    findstr /c:" %%a" "%BUILD%\imports.txt" >nul && set "WIN7_BAD=!WIN7_BAD! %%a"
+)
+if defined WIN7_BAD (
+    echo.
+    echo *** Windows 7 check FAILED - FastSMRW.exe statically imports:!WIN7_BAD!
+    echo *** This toolset ^(cl 14.51+ / Visual Studio 2026^) can no longer build
+    echo *** for Windows 7. Use Visual Studio 2022 ^(toolset 14.44^) instead.
+    if defined FASTSM_STRICT_WIN7 goto error
+    echo *** Continuing anyway - do NOT ship this binary.
+    echo.
+) else (
+    echo Windows 7 import floor OK.
+)
+
 REM ---- 2b) assemble the dist run folder (exe + bundled assets) ----
 echo Assembling dist...
 if not exist dist mkdir dist
