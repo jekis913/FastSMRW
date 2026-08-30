@@ -80,6 +80,13 @@ private:
     // --- list plumbing
     void populate_timelines_list();
     void bind_current_to_view();
+    // A content-only update to the visible timeline (relative timestamps ticking
+    // over, counts changing) whose row ids are unchanged: rewrites just the
+    // changed cells' text in place and leaves the cursor alone, so Orca doesn't
+    // re-announce the focused row. Returns false (and changes nothing) when the
+    // ids differ, so the caller falls back to a full rebind. old_rows is the row
+    // set the store currently shows; new rows are already in the timeline.
+    bool refresh_current_rows_text(const std::vector<Row>& old_rows);
     void set_posts_cursor(int row);
     int index_of_id(const Timeline& tl, const std::string& id) const;
     void maybe_load_older(int row);

@@ -531,6 +531,33 @@ void MainWindow::bind_current_to_view() {
     updating_ = false;
 }
 
+bool MainWindow::refresh_current_rows_text(const std::vector<Row>& old_rows) {
+    Timeline* tc = current();
+    if (!tc)
+        return false;
+    // Only a same-length, same-order, same-id update can be edited in place; any
+    // structural change (a post streamed in, a gap filled, a deletion) needs the
+    // full rebind so rows are inserted/removed and the cursor re-anchored.
+    if (old_rows.size() != tc->rows.size())
+        return false;
+    for (size_t i = 0; i < old_rows.size(); ++i)
+        if (old_rows[i].id != tc->rows[i].id)
+            return false;
+    // Same rows: rewrite only the cells whose text actually changed, without
+    // touching the cursor (moving it would make Orca re-read the row).
+    GtkTreeModel* model = GTK_TREE_MODEL(posts_store_);
+    updating_ = true;
+    for (size_t i = 0; i < tc->rows.size(); ++i) {
+        if (old_rows[i].text == tc->rows[i].text)
+            continue;
+        GtkTreeIter iter;
+        if (gtk_tree_model_iter_nth_child(model, &iter, nullptr, static_cast<int>(i)))
+            gtk_list_store_set(posts_store_, &iter, 0, tc->rows[i].text.c_str(), -1);
+    }
+    updating_ = false;
+    return true;
+}
+
 void MainWindow::set_posts_cursor(int row) {
     GtkTreePath* path = gtk_tree_path_new_from_indices(row, -1);
     gtk_tree_view_set_cursor(GTK_TREE_VIEW(posts_view_), path, nullptr, FALSE);
@@ -1501,6 +1528,10 @@ void MainWindow::ev_timeline_updated(const json& e) {
         return;
     Timeline& tl = timelines_[static_cast<size_t>(index)];
     tl.reversed = e.value("reversed", false);
+    // Keep the old rows so a content-only re-emit (relative timestamps ticking
+    // over on the timeline the user is sitting on) can update cells in place
+    // instead of rebuilding the whole model and re-announcing the focused row.
+    std::vector<Row> old_rows = std::move(tl.rows);
     tl.rows.clear();
     for (const auto& r : e.value("rows", json::array())) {
         Row row;
@@ -1527,7 +1558,8 @@ void MainWindow::ev_timeline_updated(const json& e) {
     }
     if (index == current_) {
         load_pending_ = false;
-        bind_current_to_view();
+        if (!refresh_current_rows_text(old_rows))
+            bind_current_to_view();
     }
 }
 

@@ -4638,11 +4638,29 @@ void CoreSession::auto_refresh_loop() {
     // so background accounts stay as fresh as the one on screen. Refreshes are
     // posted to the core loop and the worker runs them serially, so even many
     // accounts never spike the CPU.
+    //
+    // A second, independent cadence re-emits the visible timeline so its relative
+    // timestamps ("2m" -> "3m") advance while the user sits on it. A network poll
+    // is NOT enough: it early-returns for static sources (favourites/bookmarks)
+    // and does nothing when the interval is 0, and macOS caches each row's
+    // composed string in its cell view, so a focused row keeps speaking the old
+    // time until the core re-emits. This tick is cheap (one timeline, no network)
+    // and the UIs update the text in place without re-announcing the row.
+    constexpr int kRelativeRefreshSeconds = 30;
     int elapsed = 0;
+    int rel_elapsed = 0;
     while (auto_refresh_running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if (!auto_refresh_running_.load())
             break;
+        if (++rel_elapsed >= kRelativeRefreshSeconds) {
+            rel_elapsed = 0;
+            // Read current_ on the core loop, where the timeline state lives.
+            loop_.post([this] {
+                if (current_ >= 0 && current_ < static_cast<int>(timelines_.size()))
+                    emit_timeline(current_);
+            });
+        }
         const int interval = auto_refresh_seconds_.load();
         if (interval <= 0) {
             elapsed = 0;

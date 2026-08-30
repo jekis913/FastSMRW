@@ -11,6 +11,7 @@ FastSMRW changelog
 - New: a "Boosted by (handle)" speech field, so you can hear who boosted a post as an @handle instead of a display name.
 - Fixed: the view post dialog now tells you whether a post is public, quiet public, followers only, or to specific people.
 - Fixed: copying a post to the clipboard keeps the line breaks its author wrote, instead of running the paragraphs together.
+- Fixed: the ages shown on posts (like "2m" or "1h") now keep counting up while you sit on a timeline, instead of freezing until something new arrives.
 - Fixed: on Linux, FastSM no longer closes itself moments after starting when the invisible interface is turned on, and the Keyboard Manager no longer closes it when you pick a keymap.
 - Fixed: on Linux, looking at another keymap in the Keyboard Manager no longer takes over the hotkeys you actually have active, matching Windows.
 - Fixed: FastSM starts again on Windows 7 — downloaded builds since 0.5.0 refused to open with an "entry point not found" error.
