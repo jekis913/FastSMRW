@@ -92,6 +92,7 @@ Single letters work on the focused post:
 - `P` — Pin or unpin your own post to your profile.
 - `A` — Auto-read: new posts in this timeline are read aloud as they arrive.
 - `U` — Open the poster's posts as a timeline.
+- `D` — Send the poster a direct message (Mastodon).
 - `H` — Follow a hashtag from the post.
 - `Delete` — Delete your own post.
 - `Period` — Load older posts.

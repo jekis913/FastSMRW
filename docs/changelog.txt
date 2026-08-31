@@ -1,6 +1,12 @@
 FastSMRW changelog
 ==================
 
+0.5.6
+-----
+
+- New: send someone a direct message from their profile, from the post menu, or with the D key — it opens a new post already addressed to them and set to go only to them (Mastodon).
+- Fixed: on the Mac and iOS, the cursor now starts at the end of a post you are editing instead of in front of it.
+
 0.5.5
 -----
 

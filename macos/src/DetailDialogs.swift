@@ -398,6 +398,11 @@ final class UserProfileWindowController: DetailSheetController {
         buttons.append(("Following", false, { [weak self] in
             self?.dismiss(); state.openFollowing(accountId: accountId, acct: acct)
         }))
+        if profile.canMessage {
+            buttons.append(("Send a Message…", false, { [weak self] in
+                self?.dismiss(); state.messageUser(accountId: accountId, acct: acct)
+            }))
+        }
         if profile.canUseLists {
             buttons.append(("Add to List…", false, { [weak self] in
                 self?.dismiss(); state.getUserLists(accountId: accountId, acct: acct)
@@ -506,6 +511,7 @@ final class UserPickerWindowController: NSWindowController, NSTableViewDataSourc
         switch picker.purpose {
         case "timeline": state.openUserTimeline(accountId: user.id, acct: user.acct)
         case "profile": state.openUserProfile(accountId: user.id, acct: user.acct)
+        case "message": state.messageUser(accountId: user.id, acct: user.acct)
         case "follow_toggle": state.followToggle(accountId: user.id, acct: user.acct)
         case "alias": state.beginAliasAccount(id: picker.id, accountId: user.id)
         default: break

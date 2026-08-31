@@ -67,6 +67,9 @@ std::optional<std::string> show_user_profile_dialog(GtkWindow* parent, const jso
     };
 
     add_action("view_posts", "View _Posts");
+    // Direct messages need the direct visibility level (Mastodon only).
+    if (e.value("can_message", false))
+        add_action("message", "Send a Messa_ge…");
     add_action("followers", "F_ollowers");
     add_action("following", "Follo_wing");
     if (has_url)

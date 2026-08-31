@@ -349,3 +349,4 @@
 #define IDC_EP_F8_VALUE        656
 #define IDC_EP_FIELDS_LABEL    657
 #define IDC_EP_PRIVACY_LABEL   658
+#define IDC_PROFILE_MESSAGE     659

@@ -78,6 +78,7 @@ The Status menu holds the full set, with shortcuts:
 - `E` — Edit.
 - `Cmd+Delete` — Delete your post.
 - `P` — Pin to your profile.
+- `D` — Send a direct message (Mastodon).
 - `Cmd+Semicolon` — Speak the user.
 - `Cmd+Shift+Semicolon` — Speak the referenced reply.
 - `Cmd+I` — Post info.

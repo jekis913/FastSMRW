@@ -18,6 +18,7 @@ enum class UserProfileAction {
     ToggleBoosts,
     Lists,
     Report,
+    Message,
 };
 
 // The viewer's relationship to the user (for relationship-aware button labels).
@@ -30,6 +31,7 @@ struct UserProfileRelationship {
     bool showing_reblogs = true; // their boosts are shown
     bool can_hide_boosts = false; // platform supports hiding boosts
     bool can_use_lists = false;   // platform supports lists (Mastodon)
+    bool can_message = false;     // platform supports direct messages (Mastodon)
 };
 
 // Modal Open User Profile dialog (Mac parity): a read-only review of the user's

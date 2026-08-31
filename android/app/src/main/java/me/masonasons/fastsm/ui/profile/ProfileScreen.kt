@@ -98,6 +98,14 @@ fun ProfileScreen(
 
                 Button(onClick = onViewPosts) { Text("View posts") }
 
+                // Direct messages need the direct visibility level (Mastodon only).
+                if (profile.canMessage) {
+                    Button(onClick = {
+                        viewModel.messageUserPicked(profile.accountId, profile.acct)
+                        onClose()
+                    }) { Text("Send a message") }
+                }
+
                 TextButton(onClick = { showReport = true }) { Text("Report") }
 
                 if (profile.url.isNotBlank()) {

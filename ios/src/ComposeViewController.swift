@@ -136,7 +136,13 @@ final class ComposeViewController: StaticFormViewController {
         // line and Command+Return sends, matching the Mac.
         textView.enterToSend = context.enterToSend ?? false
         textView.onSend = { [weak self] in self?.postTapped() }
-        if let prefill = context.prefillText { textView.text = prefill }
+        if let prefill = context.prefillText {
+            textView.text = prefill
+            // Caret after the prefilled text (the @handle of a direct message, the
+            // existing text of an edit), like the other front ends -- otherwise
+            // typing lands in front of it.
+            textView.selectedRange = NSRange(location: (prefill as NSString).length, length: 0)
+        }
         textView.translatesAutoresizingMaskIntoConstraints = false
         textCell.contentView.addSubview(textView)
         NSLayoutConstraint.activate([

@@ -26,6 +26,11 @@ void test_keymap_default_and_catalog() {
     CHECK(cat.size() > 10);
     CHECK(find_action("Reply") != nullptr); // tokens match the Python client for sharing
     CHECK(find_action("does_not_exist") == nullptr);
+    // Direct messages are reachable as an assignable hotkey and inside the layer.
+    // M is already the bookmark toggle everywhere, so the layer key is D.
+    CHECK(find_action("MessageUser") != nullptr);
+    CHECK_EQ(layer_keymap().at("d"), std::string("MessageUser"));
+    CHECK_EQ(layer_keymap().at("m"), std::string("BookmarkToggle"));
 
     KeyBindings def = default_bindings();
     // Reply default is control+win+r -> "Reply".

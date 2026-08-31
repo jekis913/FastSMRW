@@ -447,6 +447,12 @@ final class AppState {
     func openUserProfile(accountId: String, acct: String) {
         client.send("open_user_profile", ["account_id": accountId, "acct": acct])
     }
+    /// Start a direct message to a user: the core opens the composer addressed to
+    /// them with the visibility already set to direct (Mastodon only).
+    func messageUser(accountId: String, acct: String) {
+        client.send("message_user", ["account_id": accountId, "acct": acct])
+    }
+    func messageUser(id: String) { client.send("message_user", ["id": id]) }
     func followToggle(accountId: String, acct: String) {
         client.send("follow_toggle", ["account_id": accountId, "acct": acct])
     }

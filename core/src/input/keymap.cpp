@@ -161,6 +161,7 @@ KeyBindings layer_keymap() {
         {"c", "Copy"},                // C copies the post / user
         {"p", "PinPost"},            {"t", "NewTimeline"},
         {"u", "UserTimeline"},        {"h", "FollowHashtag"},
+        {"d", "MessageUser"},         // D directly messages the post author
         {"l", "FollowToggle"},        // L follows/unfollows the post author
         {"shift+h", "ToggleWindow"}, // Shift+H shows/hides the window
         {"o", "Url"},                {"w", "CloseTimeline"}, // W closes the current timeline
@@ -198,6 +199,7 @@ std::string layer_help_text() {
            "P: Pin or unpin your post to your profile\n"
            "T: New timeline\n"
            "U: User's timeline\n"
+           "D: Send the user a direct message\n"
            "L: Follow or unfollow the user\n"
            "H: Follow a hashtag\n"
            "O: Open links\n"
@@ -322,6 +324,7 @@ const std::vector<ActionDef>& action_catalog() {
         // --- user actions ---
         {"UserTimeline", "Open user timeline", "alt+win+u"},
         {"UserProfile", "Open user profile", "alt+win+shift+u"},
+        {"MessageUser", "Send a direct message", "alt+win+m"},
         {"OpenFollowers", "Open the user's followers", ""},  // unbound (focused user)
         {"OpenFollowing", "Open who the user follows", ""},  // unbound (focused user)
         {"FavoritedBy", "Who liked this post", ""},          // unbound

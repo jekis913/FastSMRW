@@ -73,6 +73,7 @@ in what order in Settings, under Post actions. Available actions include:
 - Copy.
 - Report the post.
 - View the author's posts, View the author's profile, Speak user info.
+- Send the author a direct message (Mastodon).
 - Add or edit an alias (a custom name) for the author.
 - Speak the referenced reply, or jump to it (when the post is a reply).
 - Edit or Delete (your own posts only; Delete asks you to confirm).

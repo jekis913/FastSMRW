@@ -154,6 +154,8 @@ data class ProfileUi(
     val muting: Boolean,
     val blocking: Boolean,
     val requested: Boolean,
+    // Direct messages need the direct visibility level (Mastodon only).
+    val canMessage: Boolean = false,
 )
 
 /**
@@ -547,6 +549,7 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
                 muting = e.optBoolean("muting"),
                 blocking = e.optBoolean("blocking"),
                 requested = e.optBoolean("requested"),
+                canMessage = e.optBoolean("can_message"),
             )
 
             "media_open" -> _media.value =
@@ -679,6 +682,18 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
     /** Open a post author's profile (may raise a user_picker). */
     fun openUserProfile(rowId: String) =
         core.dispatch("open_user_profile") { put("id", rowId) }
+
+    /**
+     * Start a direct message: the core opens the composer addressed to the user
+     * with the visibility already set to direct (may raise a user_picker).
+     */
+    fun messageUser(rowId: String) = core.dispatch("message_user") { put("id", rowId) }
+
+    /** Start a direct message to a specific user (the profile screen / picker). */
+    fun messageUserPicked(accountId: String, acct: String) {
+        _userPicker.value = null
+        core.dispatch("message_user") { put("account_id", accountId); put("acct", acct) }
+    }
 
     /** Search accounts for @-mention autocomplete; results arrive on mentionSuggestions. */
     fun autocompleteUsers(query: String) = core.dispatch("autocomplete_users") { put("query", query) }

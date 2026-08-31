@@ -165,6 +165,11 @@ final class UserProfileViewController: ActionListViewController {
         items.append(Item(title: "Following", pops: true) {
             state.openFollowing(accountId: accountId, acct: acct)
         })
+        if profile.canMessage {
+            items.append(Item(title: "Send a Message…", pops: true) {
+                state.messageUser(accountId: accountId, acct: acct)
+            })
+        }
         if profile.canUseLists {
             items.append(Item(title: "Add to List…") {
                 state.getUserLists(accountId: accountId, acct: acct)

@@ -699,6 +699,9 @@ final class MainViewController: UIViewController {
         addKey("u", .command, "User Profile") { [weak self] in
             self?.withKeyboardRow { row in self?.state.openUserProfile(id: row.id) }
         }
+        addKey("d", [], "Send a Message") { [weak self] in
+            self?.withKeyboardRow { row in self?.state.messageUser(id: row.id) }
+        }
         addKey("i", .command, "Post Info") { [weak self] in
             self?.withKeyboardRow { row in self?.state.postInfo(id: row.id) }
         }
@@ -1068,6 +1071,8 @@ final class MainViewController: UIViewController {
             return ("Copy", { [weak self] in self?.state.copy(id: id) })
         case "user_profile":
             return ("User Profile", { [weak self] in self?.state.openUserProfile(id: id) })
+        case "message":
+            return ("Send a Direct Message", { [weak self] in self?.state.messageUser(id: id) })
         case "user_timeline":
             return ("User Timeline", { [weak self] in self?.state.openUserTimeline(id: id) })
         case "followers":
@@ -1153,6 +1158,7 @@ final class MainViewController: UIViewController {
                 switch picker.purpose {
                 case "timeline": self.state.openUserTimeline(accountId: user.id, acct: user.acct)
                 case "profile": self.state.openUserProfile(accountId: user.id, acct: user.acct)
+                case "message": self.state.messageUser(accountId: user.id, acct: user.acct)
                 case "follow_toggle": self.state.followToggle(accountId: user.id, acct: user.acct)
                 case "alias": self.state.beginAliasAccount(id: picker.id, accountId: user.id)
                 default: break

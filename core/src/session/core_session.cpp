@@ -456,6 +456,8 @@ void CoreSession::handle(const json& cmd) {
         cmd_open_user_timeline(cmd);
     else if (c == "open_user_profile")
         cmd_open_user_profile(cmd);
+    else if (c == "message_user")
+        cmd_message_user(cmd);
     else if (c == "speak_user")
         cmd_speak_user(cmd);
     else if (c == "begin_alias")
@@ -1669,10 +1671,12 @@ void CoreSession::emit_user_profile(const User& u) {
     const std::string handle = u.acct.empty() ? u.username : u.acct;
     const bool can_hide_boosts = acct && acct->features().hide_boosts;
     const bool can_use_lists = acct && acct->platform() == Platform::Mastodon;
+    // Direct messages need the direct visibility level, which is Mastodon-only.
+    const bool can_message = acct && acct->features().visibility;
     // Off-thread: enrich a sparse row (Bluesky) via fetch_profile, compose the
     // text, and fetch the relationship, then emit. Profiling a mention still
     // works (everything is keyed by id).
-    worker_.post([this, acct, user, handle, can_hide_boosts, can_use_lists] {
+    worker_.post([this, acct, user, handle, can_hide_boosts, can_use_lists, can_message] {
         User full = user;
         if (acct && !user.id.empty())
             if (auto p = acct->fetch_profile(user.id))
@@ -1681,7 +1685,7 @@ void CoreSession::emit_user_profile(const User& u) {
         std::optional<Relationship> rel;
         if (acct && !user.id.empty())
             rel = acct->relationship(user.id);
-        loop_.post([this, full, text, handle, rel, can_hide_boosts, can_use_lists] {
+        loop_.post([this, full, text, handle, rel, can_hide_boosts, can_use_lists, can_message] {
             json e = {{"event", "user_profile"},
                       {"text", text},
                       {"account_id", full.id},
@@ -1689,7 +1693,8 @@ void CoreSession::emit_user_profile(const User& u) {
                       {"url", full.url},
                       {"has_relationship", rel.has_value()},
                       {"can_hide_boosts", can_hide_boosts},
-                      {"can_use_lists", can_use_lists}};
+                      {"can_use_lists", can_use_lists},
+                      {"can_message", can_message}};
             if (rel) {
                 e["following"] = rel->following;
                 e["muting"] = rel->muting;
@@ -2088,6 +2093,57 @@ void CoreSession::cmd_open_user_profile(const json& cmd) {
         return;
     }
     emit_user_picker("profile", row_id, users);
+}
+
+// Start a direct message: open the composer addressed to the user with the
+// visibility already set to direct. The user comes from an explicit choice
+// (profile dialog / picker), a typed handle, or the focused row's post.
+void CoreSession::cmd_message_user(const json& cmd) {
+    SocialAccount* acct = accounts_.selected();
+    if (!acct)
+        return;
+    // Direct posts are a Mastodon visibility level. Bluesky posts are always
+    // public and its chat is a separate service we don't speak, so refuse rather
+    // than open a composer whose "message" would go out in the open.
+    if (!acct->features().visibility) {
+        sound_.play(sound::Earcon::Error);
+        emit_announce("Direct messages aren't supported on this account.");
+        return;
+    }
+    auto compose_to = [this](const User& u) {
+        cmd_compose_context(
+            {{"mode", "message"}, {"acct", u.acct.empty() ? u.username : u.acct}});
+    };
+    // A handle was typed manually ("Type a handle…"): resolve it, then compose.
+    if (cmd.contains("handle")) {
+        resolve_handle(cmd.value("handle", std::string{}), compose_to);
+        return;
+    }
+    // A specific user was chosen (the picker, or the profile dialog's button).
+    if (cmd.contains("acct")) {
+        User u;
+        u.id = cmd.value("account_id", std::string{});
+        u.acct = cmd.value("acct", std::string{});
+        if (u.acct.empty())
+            return;
+        compose_to(u);
+        return;
+    }
+    TimelineController* tc = current();
+    const std::string row_id = cmd.value("id", std::string{});
+    const TimelineItem* item = tc ? find_item(tc, row_id) : nullptr;
+    if (!item)
+        return;
+    const std::vector<User> users = users_in_post(*item);
+    if (users.empty())
+        return;
+    // With "pick" the UI always wants the menu (so "Type a handle…" is reachable);
+    // otherwise a lone user is messaged straight away.
+    if (users.size() == 1 && !cmd.value("pick", false)) {
+        compose_to(users.front());
+        return;
+    }
+    emit_user_picker("message", row_id, users);
 }
 
 // Ctrl+; : speak the focused post's user(s) using the user speech template. A lone
@@ -2824,6 +2880,19 @@ void CoreSession::cmd_compose_context(const json& cmd) {
         if (target->spoiler_text)
             ctx["prefill_cw"] = *target->spoiler_text;
         ctx["edit_id"] = target->id;
+    } else if (mode == "message") {
+        // A direct message is an ordinary post addressed to the user with direct
+        // visibility. The handle goes in the body — that's how the server routes
+        // it — so the writer can see and edit who it's going to.
+        const std::string handle = cmd.value("acct", std::string{});
+        if (handle.empty()) {
+            emit_announce("Couldn't tell who to message.");
+            return;
+        }
+        ctx["title"] = "Direct Message";
+        ctx["context_label"] = "Messaging @" + handle;
+        ctx["prefill_text"] = "@" + handle + " ";
+        ctx["default_visibility"] = static_cast<int>(Visibility::Direct);
     } else {
         ctx["title"] = "New Post";
     }
@@ -3494,6 +3563,8 @@ bool CoreSession::run_post_action(const std::string& key, const std::string& row
         return cmd_copy({{"id", row}}), true;
     if (key == "user_profile")
         return cmd_open_user_profile({{"id", row}, {"pick", true}}), true;
+    if (key == "message")
+        return cmd_message_user({{"id", row}, {"pick", true}}), true;
     if (key == "user_timeline")
         return cmd_open_user_timeline({{"id", row}, {"pick", true}}), true;
     if (key == "followers")
@@ -3680,6 +3751,8 @@ void CoreSession::cmd_perform_action(const json& cmd) {
         return cmd_open_user_timeline({{"id", row}, {"pick", true}});
     if (a == "UserProfile")
         return cmd_open_user_profile({{"id", row}, {"pick", true}});
+    if (a == "MessageUser")
+        return cmd_message_user({{"id", row}, {"pick", true}});
     if (a == "OpenFollowers")
         return cmd_open_followers({{"id", row}});
     if (a == "OpenFollowing")

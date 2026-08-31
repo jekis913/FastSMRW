@@ -270,6 +270,7 @@ fun HomeScreen(
                 onOpenThread = viewModel::openThread,
                 onOpenAuthor = viewModel::openUserTimeline,
                 onOpenProfile = viewModel::openUserProfile,
+                onMessageUser = viewModel::messageUser,
                 onViewMedia = viewModel::playMedia,
                 onToggleFavorite = viewModel::toggleFavorite,
                 onToggleBoost = viewModel::toggleBoost,
@@ -304,6 +305,7 @@ fun HomeScreen(
                             when (req.purpose) {
                                 "profile" -> viewModel.openUserProfilePicked(req.rowId, u.id)
                                 "alias" -> viewModel.beginAliasPicked(req.rowId, u.id)
+                                "message" -> viewModel.messageUserPicked(u.id, u.acct)
                                 else -> viewModel.openUserTimelinePicked(u.id, u.acct)
                             }
                         }) {
@@ -597,6 +599,7 @@ private fun StatusList(
     onOpenThread: (String) -> Unit,
     onOpenAuthor: (String) -> Unit,
     onOpenProfile: (String) -> Unit,
+    onMessageUser: (String) -> Unit,
     onViewMedia: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onToggleBoost: (String) -> Unit,
@@ -702,6 +705,7 @@ private fun StatusList(
                 onOpenThread = onOpenThread,
                 onOpenAuthor = onOpenAuthor,
                 onOpenProfile = onOpenProfile,
+                onMessageUser = onMessageUser,
                 onViewMedia = onViewMedia,
                 onToggleFavorite = onToggleFavorite,
                 onToggleBoost = onToggleBoost,

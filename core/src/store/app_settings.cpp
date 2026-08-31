@@ -24,6 +24,7 @@ const std::vector<PostActionDef>& post_action_catalog() {
         {"quote", "Quote"},                  {"thread", "View Thread"},
         {"post_info", "Post Info"},          {"copy", "Copy"},
         {"user_profile", "User Profile"},    {"user_timeline", "User Timeline"},
+        {"message", "Send a Direct Message"},
         {"followers", "Followers"},          {"following", "Following"},
         {"mute_conversation", "Mute Conversation"},
         {"favorited_by", "See Who Favorited"}, {"reblogged_by", "See Who Boosted"},

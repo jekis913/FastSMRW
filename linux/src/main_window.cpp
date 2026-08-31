@@ -270,6 +270,7 @@ void MainWindow::build_menu() {
     sep(status_menu);
     on_selected(status_menu, "Open _User Timeline", 0, none, "open_user_timeline", true);
     on_selected(status_menu, "Open User _Profile", GDK_KEY_u, ctrl, "open_user_profile", true);
+    on_selected(status_menu, "Sen_d a Message…", 0, none, "message_user", true);
     on_selected(status_menu, "_Speak User", GDK_KEY_semicolon, ctrl, "speak_user", false);
     // Shifted punctuation: GTK matches the translated keyval, so Shift+";" is
     // ":" (and Shift+"," is "<" below) — register those, not the base keys.
@@ -1901,6 +1902,8 @@ void MainWindow::ev_user_profile(const json& e) {
         }
     } else if (*action == "boosts") {
         set_rel(e.value("showing_reblogs", true) ? "hide_boosts" : "show_boosts");
+    } else if (*action == "message") {
+        dispatch_cmd({{"cmd", "message_user"}, {"account_id", account_id}, {"acct", acct}});
     } else if (*action == "lists") {
         // Fetch the lists + this user's membership; ev_user_lists opens the
         // checklist when they arrive.
@@ -1985,6 +1988,8 @@ void MainWindow::ev_user_picker(const json& e) {
                 return;
             if (p.purpose == "timeline")
                 self->dispatch_cmd({{"cmd", "open_user_timeline"}, {"handle", *handle}});
+            else if (p.purpose == "message")
+                self->dispatch_cmd({{"cmd", "message_user"}, {"handle", *handle}});
             else if (p.purpose == "follow_toggle")
                 self->dispatch_cmd({{"cmd", "follow_toggle"}, {"handle", *handle}});
             else if (p.purpose == "alias")
@@ -1997,6 +2002,9 @@ void MainWindow::ev_user_picker(const json& e) {
             self->dispatch_cmd({{"cmd", "open_user_timeline"},
                                 {"account_id", p.account_id},
                                 {"acct", p.acct}});
+        else if (p.purpose == "message")
+            self->dispatch_cmd(
+                {{"cmd", "message_user"}, {"account_id", p.account_id}, {"acct", p.acct}});
         else if (p.purpose == "follow_toggle")
             self->dispatch_cmd(
                 {{"cmd", "follow_toggle"}, {"account_id", p.account_id}, {"acct", p.acct}});
@@ -2864,6 +2872,12 @@ gboolean MainWindow::on_posts_key(GtkWidget*, GdkEventKey* event, gpointer user)
             return TRUE;
         }
         self->do_enter_post_action();
+        return TRUE;
+    }
+    case GDK_KEY_d: { // direct-message someone in the post (M is taken by bookmark)
+        const std::string id = self->selected_id();
+        if (!id.empty())
+            self->dispatch_cmd({{"cmd", "message_user"}, {"id", id}, {"pick", true}});
         return TRUE;
     }
     case GDK_KEY_u: { // open the author's posts

@@ -30,3 +30,4 @@ control+shift+win+left=PrevAccount
 control+shift+win+right=NextAccount
 control+win+,=prev_movement
 control+win+.=next_movement
+control+win+m=MessageUser

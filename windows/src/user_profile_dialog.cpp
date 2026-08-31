@@ -50,6 +50,9 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
         // Lists button only for platforms with lists (Mastodon).
         if (!r.can_use_lists)
             ShowWindow(GetDlgItem(dlg, IDC_PROFILE_LISTS), SW_HIDE);
+        // Direct messages need the direct visibility level (Mastodon only).
+        if (!r.can_message)
+            ShowWindow(GetDlgItem(dlg, IDC_PROFILE_MESSAGE), SW_HIDE);
 
         SetFocus(GetDlgItem(dlg, IDC_PROFILE_TEXT)); // read the profile immediately
         return FALSE;                                // focus set explicitly
@@ -88,6 +91,9 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp) {
             return TRUE;
         case IDC_PROFILE_LISTS:
             finish(UserProfileAction::Lists);
+            return TRUE;
+        case IDC_PROFILE_MESSAGE:
+            finish(UserProfileAction::Message);
             return TRUE;
         case IDC_PROFILE_REPORT:
             finish(UserProfileAction::Report);

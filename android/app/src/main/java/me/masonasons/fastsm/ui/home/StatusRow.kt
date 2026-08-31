@@ -39,7 +39,7 @@ import me.masonasons.fastsm.ui.RowUi
 private val DEFAULT_POST_ACTION_ORDER = listOf(
     "play_media", "reply", "boost", "favorite", "bookmark", "quote", "thread",
     "mute_conversation", "favorited_by", "reblogged_by", "copy", "user_timeline",
-    "user_profile", "speak_user", "alias", "speak_reply", "jump_reply", "edit",
+    "user_profile", "message", "speak_user", "alias", "speak_reply", "jump_reply", "edit",
     "report", "delete",
 )
 
@@ -54,6 +54,7 @@ fun StatusRow(
     onOpenThread: (String) -> Unit,
     onOpenAuthor: (String) -> Unit,
     onOpenProfile: (String) -> Unit,
+    onMessageUser: (String) -> Unit,
     onViewMedia: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onToggleBoost: (String) -> Unit,
@@ -111,6 +112,7 @@ fun StatusRow(
                 "report" -> MenuAction("Report post") { showReport = true }
                 "user_timeline" -> MenuAction("View author's posts") { onOpenAuthor(row.id) }
                 "user_profile" -> MenuAction("View author's profile") { onOpenProfile(row.id) }
+                "message" -> MenuAction("Send a direct message") { onMessageUser(row.id) }
                 "speak_user" -> MenuAction("Speak user info") { onSpeakUser(row.id) }
                 "alias" -> MenuAction("Add or edit alias") { onAddAlias(row.id) }
                 "speak_reply" ->

@@ -381,6 +381,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate {
     @objc func viewThread(_ sender: Any?) { postsViewController.viewThread(sender) }
     @objc func openUserTimeline(_ sender: Any?) { postsViewController.openUserTimeline(sender) }
     @objc func openUserProfile(_ sender: Any?) { postsViewController.openUserProfile(sender) }
+    @objc func messageUser(_ sender: Any?) { postsViewController.messageUser(sender) }
     @objc func addAlias(_ sender: Any?) { postsViewController.addAlias(sender) }
     @objc func manageAliases(_ sender: Any?) { state.listAliases() }
     @objc func userAnalysis(_ sender: Any?) { presentUserAnalysis() }

@@ -62,6 +62,7 @@ enum {
     ID_VIEW_THREAD,
     ID_USER_TIMELINE,
     ID_USER_PROFILE,
+    ID_MESSAGE_USER,
     ID_SPEAK_USER,
     ID_SPEAK_REPLY,
     ID_FOLLOW_TOGGLE,
@@ -252,6 +253,7 @@ HMENU build_menu() {
     AppendMenuW(status, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(status, MF_STRING, ID_USER_TIMELINE, L"Open &User Timeline");
     AppendMenuW(status, MF_STRING, ID_USER_PROFILE, L"Open User &Profile\tCtrl+U");
+    AppendMenuW(status, MF_STRING, ID_MESSAGE_USER, L"Sen&d a Message…\tD");
     AppendMenuW(status, MF_STRING, ID_SPEAK_USER, L"&Speak User\tCtrl+;");
     AppendMenuW(status, MF_STRING, ID_SPEAK_REPLY, L"Speak &Referenced Reply\tCtrl+Shift+;");
     AppendMenuW(status, MF_STRING, ID_FOLLOW_TOGGLE, L"Fo&llow / Unfollow\tCtrl+L");
@@ -946,6 +948,12 @@ void MainWindow::on_view_keydown(int vk) {
             dispatch_cmd({{"cmd", "open_user_timeline"}, {"id", id}, {"pick", true}});
         break;
     }
+    case 'D': { // direct-message someone in the post (M is taken by bookmark)
+        const std::string id = selected_id();
+        if (!id.empty())
+            dispatch_cmd({{"cmd", "message_user"}, {"id", id}, {"pick", true}});
+        break;
+    }
     case 'H': // follow a hashtag; prompt pre-fills with this post's hashtags
         dispatch_cmd({{"cmd", "follow_hashtag_prompt"}, {"id", selected_id()}});
         break;
@@ -1352,6 +1360,7 @@ void MainWindow::ev_user_profile(const json& e) {
     rel.showing_reblogs = e.value("showing_reblogs", true);
     rel.can_hide_boosts = e.value("can_hide_boosts", false);
     rel.can_use_lists = e.value("can_use_lists", false);
+    rel.can_message = e.value("can_message", false);
     const std::string keep_id = selected_id();
     auto guard = enter_modal();
     auto action = show_user_profile_dialog(hwnd_, inst_, text, rel);
@@ -1395,6 +1404,9 @@ void MainWindow::ev_user_profile(const json& e) {
         break;
     case UserProfileAction::ToggleBoosts:
         set_rel(rel.showing_reblogs ? "hide_boosts" : "show_boosts");
+        break;
+    case UserProfileAction::Message:
+        dispatch_cmd({{"cmd", "message_user"}, {"account_id", account_id}, {"acct", acct}});
         break;
     case UserProfileAction::Lists:
         // Fetch the account's lists + this user's membership; ev_user_lists opens
@@ -1492,6 +1504,8 @@ void MainWindow::ev_user_picker(const json& e) {
             return;
         if (purpose == "timeline")
             dispatch_cmd({{"cmd", "open_user_timeline"}, {"handle", handle}});
+        else if (purpose == "message")
+            dispatch_cmd({{"cmd", "message_user"}, {"handle", handle}});
         else if (purpose == "follow_toggle")
             dispatch_cmd({{"cmd", "follow_toggle"}, {"handle", handle}});
         else if (purpose == "alias")
@@ -1505,6 +1519,8 @@ void MainWindow::ev_user_picker(const json& e) {
     const auto& [account_id, acct] = list[static_cast<size_t>(chosen - 1)];
     if (purpose == "timeline")
         dispatch_cmd({{"cmd", "open_user_timeline"}, {"account_id", account_id}, {"acct", acct}});
+    else if (purpose == "message")
+        dispatch_cmd({{"cmd", "message_user"}, {"account_id", account_id}, {"acct", acct}});
     else if (purpose == "follow_toggle")
         dispatch_cmd({{"cmd", "follow_toggle"}, {"account_id", account_id}, {"acct", acct}});
     else if (purpose == "alias")
@@ -2112,6 +2128,12 @@ void MainWindow::handle_command(int id) {
         const std::string id = selected_id();
         if (!id.empty())
             dispatch_cmd({{"cmd", "open_user_profile"}, {"id", id}, {"pick", true}});
+        break;
+    }
+    case ID_MESSAGE_USER: {
+        const std::string id = selected_id();
+        if (!id.empty())
+            dispatch_cmd({{"cmd", "message_user"}, {"id", id}, {"pick", true}});
         break;
     }
     case ID_SPEAK_USER: {

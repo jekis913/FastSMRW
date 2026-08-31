@@ -126,7 +126,13 @@ final class ComposeWindowController: NSWindowController, NSTextViewDelegate, NST
         textView.onSend = { [weak self] in self?.send() }
         textView.onMention = { [weak self] in self?.mention() }
         textView.setAccessibilityLabel("Post text")
-        if let prefill = context.prefillText { textView.string = prefill }
+        if let prefill = context.prefillText {
+            textView.string = prefill
+            // Caret after the prefilled text (the @handle of a direct message, the
+            // existing text of an edit), like the other front ends -- otherwise
+            // typing lands in front of it.
+            textView.setSelectedRange(NSRange(location: (prefill as NSString).length, length: 0))
+        }
         let textScroll = NSScrollView()
         textScroll.documentView = textView
         textScroll.hasVerticalScroller = true

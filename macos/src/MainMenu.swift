@@ -98,6 +98,7 @@ enum MainMenu {
         add("View Thread", #selector(MainWindowController.viewThread(_:)), " ")
         add("Open User Timeline", #selector(MainWindowController.openUserTimeline(_:)), "u")
         add("Open User Profile", #selector(MainWindowController.openUserProfile(_:)), "u", [.command])
+        add("Send a Message…", #selector(MainWindowController.messageUser(_:)), "d")
         add("Add / Edit Alias…", #selector(MainWindowController.addAlias(_:)), "n", [.command, .shift])
         add("Follow / Unfollow Author", #selector(MainWindowController.followAuthorSelection(_:)), "")
         add("Followers", #selector(MainWindowController.openFollowers(_:)), "")

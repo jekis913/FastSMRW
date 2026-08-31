@@ -151,6 +151,7 @@ Bluetooth keyboards but work on iPhone too):
 - `U` — User timeline.
 - `E` — Edit.
 - `P` — Pin to profile.
+- `D` — Send a direct message (Mastodon).
 - `Cmd+U` — User profile.
 - `Cmd+I` — Post info.
 - `Cmd+O` — Open link.

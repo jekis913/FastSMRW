@@ -87,6 +87,7 @@ With a post focused in the posts list, these single keys act on it:
 - `M` — Bookmark or remove the bookmark.
 - `C` — Copy the post (or the focused user).
 - `U` — Open the author's timeline.
+- `D` — Send the author a direct message (Mastodon).
 - `P` — Pin or unpin your own post to your profile.
 - `H` — Follow a hashtag (the prompt is pre-filled with the post's hashtags).
 - `O` — Open the links in the post.
@@ -210,6 +211,7 @@ Status menu (act on the focused post):
 - `Q` — Quote.
 - `Enter` — Post info.
 - `Ctrl+U` — Open the user's profile.
+- `D` — Send a direct message (Mastodon).
 - `Ctrl+Semicolon` — Speak the user.
 - `Ctrl+Shift+Semicolon` — Speak the post this reply is answering.
 - `Ctrl+L` — Follow or unfollow the author.
@@ -263,6 +265,7 @@ In the posts list (single keys, no menu needed):
 - `M` — Bookmark or unbookmark.
 - `C` — Copy.
 - `U` — Open the author's timeline.
+- `D` — Send the author a direct message.
 - `P` — Pin or unpin your post to your profile.
 - `H` — Follow a hashtag.
 - `O` — Open links.
@@ -389,6 +392,7 @@ Layer keys (in Layer mode, after the layer opens):
 - `C` — Copy.
 - `T` — New timeline.
 - `U` — User's timeline.
+- `D` — Send the user a direct message.
 - `W` — Close timeline.
 - `L` — Follow or unfollow.
 - `H` — Follow a hashtag.

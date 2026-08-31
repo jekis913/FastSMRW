@@ -129,6 +129,10 @@ private:
     void cmd_open_status_actors(const nlohmann::json& cmd, bool boosted); // favorited/boosted-by list
     void cmd_open_user_timeline(const nlohmann::json& cmd);
     void cmd_open_user_profile(const nlohmann::json& cmd);
+    // Start a direct message to a user: opens the composer addressed to them with
+    // the visibility already set to direct. Mastodon only (Bluesky has no direct
+    // posts). Accepts {account_id, acct}, {handle}, or {id} for a focused row.
+    void cmd_message_user(const nlohmann::json& cmd);
     // Ctrl+; : one user in the focused post -> speak their info (user template);
     // many -> open a timeline of the post's users. Ctrl+Shift+; : speak the post's
     // referenced (in_reply_to) parent; a second press within a moment jumps to it.

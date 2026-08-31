@@ -215,6 +215,7 @@ struct UserProfile: Decodable {
     var hasRelationship = false
     var canHideBoosts = false
     var canUseLists = false
+    var canMessage = false
     var following: Bool?
     var muting: Bool?
     var blocking: Bool?
@@ -227,6 +228,7 @@ struct UserProfile: Decodable {
         case hasRelationship = "has_relationship"
         case canHideBoosts = "can_hide_boosts"
         case canUseLists = "can_use_lists"
+        case canMessage = "can_message"
         case showingReblogs = "showing_reblogs"
     }
 }
