@@ -266,6 +266,7 @@ Notification map_notification(const json& j) {
         if (const json* record = obj(j, "record")) {
             s.text = str(*record, "text");
             s.created_at = util::parse_iso8601(str(*record, "createdAt")).value_or(n.created_at);
+            map_facets(*record, s);
         }
         if (s.created_at == 0)
             s.created_at = n.created_at;

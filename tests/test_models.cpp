@@ -87,6 +87,7 @@ void test_status_roundtrip() {
     CHECK_EQ(back.reblog->tags.size(), size_t(2));
     CHECK_EQ(back.reblog->tags[1], std::string("welcome"));
     CHECK_EQ(back.reblog->text_links.size(), size_t(1));
+    CHECK_EQ(back.reblog->text_links[0].text, std::string("welcome"));
     CHECK_EQ(back.reblog->text_links[0].url, std::string("https://example.com/article"));
     CHECK(back.reblog->visibility.value() == Visibility::Unlisted);
     CHECK_EQ(back.reblog->media_attachments.size(), size_t(1));

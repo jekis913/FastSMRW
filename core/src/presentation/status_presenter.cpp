@@ -541,12 +541,10 @@ std::vector<PostLink> post_links(const Status& status) {
     for (const auto& link : s.text_links)
         text_links.push_back({link.text, link.url});
     anchors(s.content, text_links);
-    if (text_links.empty()) {
-        std::vector<std::string> urls;
-        find_urls_in_text(s.text, urls);
-        for (const auto& u : urls)
-            text_links.push_back({std::string{}, u});
-    }
+    std::vector<std::string> urls;
+    find_urls_in_text(s.text, urls);
+    for (const auto& u : urls)
+        text_links.push_back({std::string{}, u});
     for (const auto& [text, url] : text_links) {
         // The link-preview card's title decorates its matching text link.
         if (has_card && url == s.card->url && !s.card->title.empty())
@@ -579,11 +577,13 @@ std::vector<std::string> post_text_link_urls(const Status& status) {
         text_links.push_back({link.text, link.url});
     anchors(s.content, text_links); // HTML anchors (skips @mention / #hashtag)
     std::vector<std::string> out;
-    if (!text_links.empty()) {
-        for (const auto& [text, url] : text_links)
+    std::vector<std::string> literal_urls;
+    find_urls_in_text(s.text, literal_urls);
+    for (const auto& url : literal_urls)
+        text_links.push_back({std::string{}, url});
+    for (const auto& [text, url] : text_links) {
+        if (std::find(out.begin(), out.end(), url) == out.end())
             out.push_back(url);
-    } else {
-        find_urls_in_text(s.text, out); // Bluesky: URLs live in plain text
     }
     return out;
 }
