@@ -10,7 +10,7 @@ namespace {
 // cleanly (a magic mismatch -> empty) instead of being read with a mismatched
 // reader. v2 added Status::url. v6 added Notification group_key + notifications_count.
 // v7 added Status::filtered + tags. v9 added Bluesky reply-parent metadata.
-// v10 added Status::text_links.
+// v11 added Status::text_links.
 constexpr char kMagic[4] = {'F', 'S', 'C', 'B'};
 // Guard against runaway recursion if a file is ever corrupt/misaligned: boost/
 // quote nesting is shallow in practice.

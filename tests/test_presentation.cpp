@@ -314,6 +314,22 @@ void test_post_links() {
     CHECK_EQ(links[3].url, std::string("https://x.social/@me/123"));
     CHECK_EQ(links[3].title, std::string("Open this post in browser"));
 
+    // Mastodon HTML is authoritative: URL-looking anchor text must not become a
+    // second destination distinct from the anchor's href.
+    Status deceptive_anchor;
+    deceptive_anchor.content =
+        "<a href=\"https://actual.example\">https://displayed.example</a>";
+    deceptive_anchor.text = "https://displayed.example";
+    const std::vector<present::PostLink> anchor_links = present::post_links(deceptive_anchor);
+    CHECK_EQ(anchor_links.size(), static_cast<size_t>(1));
+    if (!anchor_links.empty())
+        CHECK_EQ(anchor_links[0].url, std::string("https://actual.example"));
+    const std::vector<std::string> anchor_urls =
+        present::post_text_link_urls(deceptive_anchor);
+    CHECK_EQ(anchor_urls.size(), static_cast<size_t>(1));
+    if (!anchor_urls.empty())
+        CHECK_EQ(anchor_urls[0], std::string("https://actual.example"));
+
     // A boost unwraps to the boosted post's links.
     Status boost;
     boost.reblog = std::make_shared<Status>(s);
