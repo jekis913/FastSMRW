@@ -7,6 +7,7 @@ FastSMRW changelog
 - New: send someone a direct message from their profile, from the post menu, or with the D key — it opens a new post already addressed to them and set to go only to them (Mastodon).
 - Fixed: on the Mac and iOS, the cursor now starts at the end of a post you are editing instead of in front of it.
 - Fixed: the ages shown on posts (like "2m" or "1h") now keep counting up while you sit on a timeline, instead of freezing until something new arrives.
+- Fixed: Open Links now finds Bluesky links hidden behind descriptive text, not just web addresses written out in the post.
 
 0.5.5
 -----

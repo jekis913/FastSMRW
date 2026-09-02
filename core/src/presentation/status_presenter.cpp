@@ -538,6 +538,8 @@ std::vector<PostLink> post_links(const Status& status) {
     // Links embedded in the text. A Mastodon post carries HTML in `content`; a
     // Bluesky post has none, so fall back to scanning its plain `text`.
     std::vector<std::pair<std::string, std::string>> text_links;
+    for (const auto& link : s.text_links)
+        text_links.push_back({link.text, link.url});
     anchors(s.content, text_links);
     if (text_links.empty()) {
         std::vector<std::string> urls;
@@ -573,6 +575,8 @@ std::vector<PostLink> post_links(const Status& status) {
 std::vector<std::string> post_text_link_urls(const Status& status) {
     const Status& s = status.display_status(); // unwrap a boost
     std::vector<std::pair<std::string, std::string>> text_links;
+    for (const auto& link : s.text_links)
+        text_links.push_back({link.text, link.url});
     anchors(s.content, text_links); // HTML anchors (skips @mention / #hashtag)
     std::vector<std::string> out;
     if (!text_links.empty()) {

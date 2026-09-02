@@ -328,6 +328,20 @@ void test_post_links() {
     CHECK_EQ(bl[0].url, std::string("https://bsky.example/x"));
     CHECK_EQ(bl[1].title, std::string("Open this post in browser"));
 
+    // Bluesky facets can link ordinary display text whose destination is not
+    // visible in the post body.
+    Status faceted;
+    faceted.text = "read this article";
+    faceted.text_links.push_back({"this article", "https://example.com/article"});
+    std::vector<present::PostLink> fl = present::post_links(faceted);
+    CHECK_EQ(fl.size(), static_cast<size_t>(1));
+    CHECK_EQ(fl[0].title, std::string("this article"));
+    CHECK_EQ(fl[0].url, std::string("https://example.com/article"));
+    const std::vector<std::string> facet_urls = present::post_text_link_urls(faceted);
+    CHECK_EQ(facet_urls.size(), static_cast<size_t>(1));
+    if (!facet_urls.empty())
+        CHECK_EQ(facet_urls[0], std::string("https://example.com/article"));
+
     // A post with only its own URL still offers that one link.
     Status plain;
     plain.text = "just some text, no links here.";

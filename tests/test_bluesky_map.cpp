@@ -160,18 +160,20 @@ void test_bluesky_notification_mapping() {
 }
 
 void test_bluesky_facet_mapping() {
-    // A post whose record carries mention + tag facets populates mentions/tags.
+    // A post whose record carries link + mention + tag facets preserves all three.
     const char* kFaceted = R"JSON({
       "post": {
         "uri": "at://did:plc:x/app.bsky.feed.post/2", "cid": "cid2",
         "author": { "did": "did:plc:x", "handle": "bob.test", "displayName": "Bob" },
         "record": {
-          "text": "hi @alice.bsky.social #a11y",
+          "text": "read this hi @alice.bsky.social #a11y",
           "createdAt": "2024-06-28T10:00:00Z",
           "facets": [
-            { "index": { "byteStart": 3, "byteEnd": 21 },
+            { "index": { "byteStart": 5, "byteEnd": 9 },
+              "features": [ { "$type": "app.bsky.richtext.facet#link", "uri": "https://example.com/article" } ] },
+            { "index": { "byteStart": 13, "byteEnd": 31 },
               "features": [ { "$type": "app.bsky.richtext.facet#mention", "did": "did:plc:alice" } ] },
-            { "index": { "byteStart": 22, "byteEnd": 27 },
+            { "index": { "byteStart": 32, "byteEnd": 37 },
               "features": [ { "$type": "app.bsky.richtext.facet#tag", "tag": "a11y" } ] }
           ]
         },
@@ -179,6 +181,11 @@ void test_bluesky_facet_mapping() {
       }
     })JSON";
     const Status s = bluesky::map_feed_item(json::parse(kFaceted));
+    CHECK_EQ(s.text_links.size(), size_t(1));
+    if (!s.text_links.empty()) {
+        CHECK_EQ(s.text_links[0].text, std::string("this"));
+        CHECK_EQ(s.text_links[0].url, std::string("https://example.com/article"));
+    }
     CHECK_EQ(s.mentions.size(), size_t(1));
     if (!s.mentions.empty()) {
         CHECK_EQ(s.mentions[0].id, std::string("did:plc:alice"));
