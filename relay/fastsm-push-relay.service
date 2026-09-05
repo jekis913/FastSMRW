@@ -1,0 +1,28 @@
+[Unit]
+Description=FastSMRW push relay (Mastodon Web Push -> APNs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=true
+EnvironmentFile=/etc/fastsm-push-relay/relay.env
+# The APNs key stays root-only (mode 600) on disk; systemd copies it into the
+# per-service credentials dir that only this (dynamic) service user can read.
+LoadCredential=apns.p8:/etc/fastsm-push-relay/AuthKey_DA36MM9RZR.p8
+Environment=APNS_KEY_PATH=%d/apns.p8
+ExecStart=/usr/local/bin/fastsm-push-relay
+Restart=on-failure
+RestartSec=3
+# Persistent state (the endpoint-id -> device map) lives here, created and
+# owned automatically for the dynamic service user.
+StateDirectory=fastsm-push-relay
+# Hardening.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/etc/fastsm-push-relay
+
+[Install]
+WantedBy=multi-user.target
