@@ -162,6 +162,12 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate {
             self.detailController = controller
             controller.beginSheet(for: window) { [weak self] in self?.detailController = nil }
         }
+        state.onHashtagTimelinePicker = { [weak self] tags in
+            guard let self, let window = self.window, self.detailController == nil else { return }
+            let controller = HashtagTimelinePickerWindowController(state: state, tags: tags)
+            self.detailController = controller
+            controller.beginSheet(for: window) { [weak self] in self?.detailController = nil }
+        }
         state.onFollowedHashtags = { [weak self] hashtags in
             guard let self, let window = self.window else { return }
             if let open = self.hashtagsController {
@@ -388,6 +394,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate {
     @objc func openFollowers(_ sender: Any?) { postsViewController.openFollowers(sender) }
     @objc func openFollowing(_ sender: Any?) { postsViewController.openFollowing(sender) }
     @objc func followHashtag(_ sender: Any?) { postsViewController.followHashtagForSelection(sender) }
+    @objc func openHashtagTimeline(_ sender: Any?) {
+        postsViewController.openHashtagTimelineForSelection(sender)
+    }
     @objc func manageHashtags(_ sender: Any?) { state.listFollowedHashtags() }
     @objc func trendingHashtags(_ sender: Any?) { state.listTrendingHashtags() }
     @objc func manageLists(_ sender: Any?) { state.listLists() }

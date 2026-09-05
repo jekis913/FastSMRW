@@ -350,6 +350,7 @@ const std::vector<ActionDef>& action_catalog() {
         {"MuteConversation", "Mute / unmute conversation", ""}, // unbound (Status menu / post info)
         {"DeletePost", "Delete your post", "alt+win+delete"}, // in-app Delete; Win8.1 overrides
         {"FollowHashtag", "Follow a hashtag", "alt+win+h"}, // in-app / layer H
+        {"OpenHashtagTimeline", "Open a hashtag's timeline", ""}, // unbound by default
         {"ManageHashtags", "Manage followed hashtags", ""}, // unbound by default
         {"CloseTimeline", "Close timeline", "alt+win+'"},
         {"ToggleWindow", "Show / hide window", "control+win+w"},

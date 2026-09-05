@@ -89,6 +89,7 @@ private val postActionLabels = mapOf(
     "following" to "Following", "mute_conversation" to "Mute conversation",
     "favorited_by" to "See who favorited", "reblogged_by" to "See who boosted",
     "alias" to "Add or edit alias", "follow_hashtag" to "Follow hashtag",
+    "open_hashtag_timeline" to "Open hashtag timeline",
     "speak_user" to "Speak user info", "speak_reply" to "Speak referenced reply",
     "jump_reply" to "Jump to referenced reply", "edit" to "Edit", "pin_post" to "Pin to profile",
     "report" to "Report post", "browser" to "Open in browser",

@@ -69,6 +69,7 @@ PlatformFeatures MastodonAccount::features() const {
     f.follow_hashtags = true;
     f.mute_conversations = true;
     f.bookmarks = true;
+    f.web_push = true;
     return f;
 }
 
@@ -1259,6 +1260,37 @@ bool MastodonAccount::unfollow_hashtag(const std::string& name) {
     std::string body;
     long status = 0;
     return request("POST", url, "", "", body, status);
+}
+
+bool MastodonAccount::subscribe_push(const std::string& endpoint, const std::string& p256dh,
+                                     const std::string& auth) {
+    // POST /api/v1/push/subscription. Replaces any existing subscription for
+    // this access token. Subscribe to every alert type; the UI can refine later.
+    const std::vector<std::pair<std::string, std::string>> params = {
+        {"subscription[endpoint]", endpoint},
+        {"subscription[keys][p256dh]", p256dh},
+        {"subscription[keys][auth]", auth},
+        {"data[alerts][mention]", "true"},
+        {"data[alerts][favourite]", "true"},
+        {"data[alerts][reblog]", "true"},
+        {"data[alerts][follow]", "true"},
+        {"data[alerts][follow_request]", "true"},
+        {"data[alerts][poll]", "true"},
+        {"data[alerts][status]", "true"},
+        {"data[alerts][update]", "true"},
+    };
+    const std::string url = credentials_.instance_url + "/api/v1/push/subscription";
+    std::string body;
+    long status = 0;
+    return request("POST", url, util::form_encode(params), "application/x-www-form-urlencoded",
+                   body, status);
+}
+
+bool MastodonAccount::unsubscribe_push() {
+    const std::string url = credentials_.instance_url + "/api/v1/push/subscription";
+    std::string body;
+    long status = 0;
+    return request("DELETE", url, "", "", body, status);
 }
 
 std::vector<FollowedTag> MastodonAccount::followed_hashtags() {

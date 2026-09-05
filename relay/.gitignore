@@ -1,0 +1,6 @@
+# Build output — the compiled relay binary is not committed.
+/dist/
+/fastsm-push-relay
+# Never commit secrets or local config.
+*.p8
+relay.env

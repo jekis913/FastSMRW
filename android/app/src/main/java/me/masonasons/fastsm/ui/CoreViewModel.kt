@@ -44,6 +44,7 @@ data class RowUi(
     val bookmarked: Boolean,
     val isMine: Boolean,
     val hasMedia: Boolean,
+    val hasHashtags: Boolean, // has >=1 hashtag -> "Open hashtag timeline" is offered
     val isReply: Boolean,
     val muted: Boolean, // conversation muted (thread notifications off)
     // Grouped like/boost notification: "favorited_by"/"reblogged_by" (or "") — tap
@@ -312,6 +313,11 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
     private val _mediaPicker = MutableStateFlow<List<MediaItemUi>?>(null)
     val mediaPicker: StateFlow<List<MediaItemUi>?> = _mediaPicker.asStateFlow()
 
+    // The hashtags in a post, to pick which one's timeline to open (the core
+    // sends this only when a post has several; one tag opens directly).
+    private val _hashtagTimelinePicker = MutableStateFlow<List<String>?>(null)
+    val hashtagTimelinePicker: StateFlow<List<String>?> = _hashtagTimelinePicker.asStateFlow()
+
     /** Timelines the user can open (Add-timeline / search screen). */
     private val _spawnables = MutableStateFlow<List<SpawnableUi>>(emptyList())
     val spawnables: StateFlow<List<SpawnableUi>> = _spawnables.asStateFlow()
@@ -429,6 +435,7 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
                                 bookmarked = r.optBoolean("bookmarked"),
                                 isMine = r.optBoolean("is_mine"),
                                 hasMedia = r.optBoolean("has_media"),
+                                hasHashtags = r.optBoolean("has_hashtags"),
                                 isReply = r.optBoolean("is_reply"),
                                 muted = r.optBoolean("muted"),
                                 groupActors = r.optString("group_actors"),
@@ -562,6 +569,13 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
                         val m = arr.getJSONObject(i)
                         add(MediaItemUi(m.optString("url"), m.optString("kind"), m.optString("title")))
                     }
+                }
+            }
+
+            "hashtag_timeline_picker" -> {
+                val arr = e.optJSONArray("tags")
+                _hashtagTimelinePicker.value = buildList {
+                    if (arr != null) for (i in 0 until arr.length()) add(arr.getString(i))
                 }
             }
 
@@ -765,6 +779,21 @@ class CoreViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Follow a hashtag by name (no '#'). */
     fun followHashtag(name: String) = core.dispatch("follow_hashtag") { put("name", name) }
+
+    /** Open the timeline for a hashtag in a post. Opens directly when the post
+     *  has one tag, else the core replies with a hashtag_timeline_picker. */
+    fun openHashtagTimelinePrompt(id: String) =
+        core.dispatch("open_hashtag_timeline_prompt") { put("id", id) }
+
+    /** A hashtag was chosen from the picker: open its timeline and dismiss. */
+    fun chooseHashtagTimeline(tag: String) {
+        _hashtagTimelinePicker.value = null
+        spawnTimeline(kind = "hashtag", value = tag)
+    }
+
+    fun dismissHashtagTimelinePicker() {
+        _hashtagTimelinePicker.value = null
+    }
 
     /** Close a tab: select it (so it's current), then dismiss it. */
     fun closeTimeline(index: Int) {

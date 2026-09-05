@@ -39,8 +39,8 @@ import me.masonasons.fastsm.ui.RowUi
 private val DEFAULT_POST_ACTION_ORDER = listOf(
     "play_media", "reply", "boost", "favorite", "bookmark", "quote", "thread",
     "mute_conversation", "favorited_by", "reblogged_by", "copy", "user_timeline",
-    "user_profile", "message", "speak_user", "alias", "speak_reply", "jump_reply", "edit",
-    "report", "delete",
+    "user_profile", "message", "open_hashtag_timeline", "speak_user", "alias",
+    "speak_reply", "jump_reply", "edit", "report", "delete",
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -70,6 +70,7 @@ fun StatusRow(
     onSpeakReply: (String) -> Unit,
     onJumpToReply: (String) -> Unit,
     onAddAlias: (String) -> Unit,
+    onOpenHashtagTimeline: (String) -> Unit,
     onReport: (id: String, category: String, comment: String, forward: Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onSetRelationship: (accountId: String, action: String, acct: String) -> Unit,
@@ -115,6 +116,10 @@ fun StatusRow(
                 "message" -> MenuAction("Send a direct message") { onMessageUser(row.id) }
                 "speak_user" -> MenuAction("Speak user info") { onSpeakUser(row.id) }
                 "alias" -> MenuAction("Add or edit alias") { onAddAlias(row.id) }
+                "open_hashtag_timeline" ->
+                    if (row.hasHashtags) MenuAction("Open hashtag timeline") {
+                        onOpenHashtagTimeline(row.id)
+                    } else null
                 "speak_reply" ->
                     if (row.isReply) MenuAction("Speak referenced reply") { onSpeakReply(row.id) } else null
                 "jump_reply" ->

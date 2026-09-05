@@ -2303,6 +2303,8 @@ void MainWindow::on_event(const std::string& js) {
         ev_lists(e);
     else if (ev == "hashtag_prompt")
         ev_hashtag_prompt(e);
+    else if (ev == "hashtag_timeline_picker")
+        ev_hashtag_timeline_picker(e);
     else if (ev == "followed_hashtags")
         ev_followed_hashtags(e);
     else if (ev == "trending_hashtags")
@@ -2791,6 +2793,40 @@ void MainWindow::ev_hashtag_prompt(const json& e) {
     leave_modal(guard);
     if (name && !name->empty())
         dispatch_cmd({{"cmd", "follow_hashtag"}, {"name", *name}});
+}
+
+void MainWindow::ev_hashtag_timeline_picker(const json& e) {
+    if (!e.contains("tags") || !e["tags"].is_array() || e["tags"].empty())
+        return;
+    leave_layer(); // a menu is opening; leave the layer (restores an overlay)
+    HMENU menu = CreatePopupMenu();
+    if (!menu)
+        return;
+    std::vector<std::string> tags; // parallels the menu items
+    UINT cmd_id = 1;
+    for (const auto& t : e["tags"])
+        if (t.is_string()) {
+            const std::string tag = t.get<std::string>();
+            AppendMenuW(menu, MF_STRING, cmd_id++, to_wide("#" + tag).c_str());
+            tags.push_back(tag);
+        }
+    POINT pt{0, 0};
+    const int row = selected_row();
+    RECT rc;
+    if (row >= 0 && ListView_GetItemRect(timeline_view_, row, &rc, LVIR_BOUNDS)) {
+        pt.x = rc.left;
+        pt.y = rc.bottom;
+        ClientToScreen(timeline_view_, &pt);
+    } else {
+        GetCursorPos(&pt);
+    }
+    const int chosen = track_popup(menu, pt);
+    DestroyMenu(menu);
+    if (chosen <= 0 || chosen > static_cast<int>(tags.size()))
+        return;
+    dispatch_cmd({{"cmd", "spawn_timeline"},
+                  {"kind", "hashtag"},
+                  {"value", tags[static_cast<size_t>(chosen - 1)]}});
 }
 
 void MainWindow::ev_followed_hashtags(const json& e) {
