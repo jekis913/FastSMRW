@@ -24,6 +24,9 @@ ARCHIVE="build/FastSMRW.xcarchive"
 EXPORT_DIR="build/export"
 
 echo "==> Archiving"
+# aps-environment is set from the provisioning profile under automatic signing
+# (not the entitlements file), so the App Store export below re-signs with a
+# distribution profile -> production APNs. No entitlement juggling needed here.
 xcodebuild archive -project FastSMRW.xcodeproj -scheme FastSMRW \
     -configuration Release -destination 'generic/platform=iOS' \
     -archivePath "$ARCHIVE" -derivedDataPath build/dd-archive \

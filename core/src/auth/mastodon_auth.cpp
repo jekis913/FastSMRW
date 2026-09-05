@@ -46,7 +46,10 @@ namespace fastsm {
 
 namespace {
 
-constexpr const char* kScopes = "read write follow";
+// "push" is required for /api/v1/push/subscription (Web Push notifications);
+// without it that endpoint 403s. Adding a scope means existing accounts must be
+// re-authorized to obtain a token that carries it.
+constexpr const char* kScopes = "read write follow push";
 constexpr const char* kClientName = "FastSMRW";
 
 std::string random_state() {

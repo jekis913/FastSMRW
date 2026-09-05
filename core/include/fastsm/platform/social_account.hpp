@@ -27,6 +27,7 @@ struct PlatformFeatures {
     bool follow_hashtags = false; // follow/unfollow hashtags (Mastodon)
     bool mute_conversations = false; // mute/unmute a thread's notifications (Mastodon)
     bool bookmarks = false;          // save/unsave a post to your bookmarks (Mastodon)
+    bool web_push = false;           // Web Push notification subscriptions (Mastodon)
 };
 
 // A moderation report. account_id is required; status_ids optionally names specific
@@ -313,6 +314,17 @@ public:
     // Each carries whether the viewer already follows it. Runs synchronously on
     // the worker thread. Empty for platforms without trends (Bluesky).
     virtual std::vector<FollowedTag> trending_hashtags() { return {}; }
+
+    // --- Web Push (optional; Mastodon /api/v1/push/subscription) ---
+    // Register/replace this account's push subscription: the relay endpoint URL
+    // plus the on-device Web Push public key (p256dh) and auth secret, both
+    // base64url. Return success. Runs synchronously on the worker thread.
+    virtual bool subscribe_push(const std::string& /*endpoint*/, const std::string& /*p256dh*/,
+                                const std::string& /*auth*/) {
+        return false;
+    }
+    // Remove this account's push subscription. Return success.
+    virtual bool unsubscribe_push() { return false; }
 
     // --- Server-side keyword filters (optional; Mastodon /api/v2/filters) ---
     // Whether this platform exposes managed server filters at all (Mastodon yes,

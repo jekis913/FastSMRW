@@ -53,6 +53,9 @@ final class AppState {
     var onUserPicker: ((UserPicker) -> Void)?
     var onClientFilter: ((ClientFilter) -> Void)?
     var onHashtagPrompt: (([String]) -> Void)?
+    var onHashtagTimelinePicker: (([String]) -> Void)?
+    var onPushSubscribeResult: ((Bool) -> Void)?
+    var onPushUnsubscribeResult: ((Bool) -> Void)?
     var onFollowedHashtags: ((FollowedHashtags) -> Void)?
     var onTrendingHashtags: ((FollowedHashtags) -> Void)?
     var onAliasPrompt: ((AliasPrompt) -> Void)?
@@ -226,6 +229,12 @@ final class AppState {
             if e.available { onClientFilter?(e.filter) }
         case let .hashtagPrompt(e):
             onHashtagPrompt?(e.tags)
+        case let .hashtagTimelinePicker(e):
+            onHashtagTimelinePicker?(e.tags)
+        case let .pushSubscribeResult(e):
+            onPushSubscribeResult?(e.ok)
+        case let .pushUnsubscribeResult(e):
+            onPushUnsubscribeResult?(e.ok)
         case let .followedHashtags(e):
             onFollowedHashtags?(e)
         case let .trendingHashtags(e):
@@ -387,6 +396,20 @@ final class AppState {
         return saved.isEmpty && postActionItems().isEmpty
             ? postActionCatalog.map { $0.key } : saved
     }
+
+    // Open the timeline for a hashtag in a post: opens directly when the post
+    // has one tag, else the core replies with a hashtag_timeline_picker event.
+    func openHashtagTimelinePrompt(id: String) {
+        client.send("open_hashtag_timeline_prompt", ["id": id])
+    }
+
+    // Web Push (Mastodon). The app generates the keypair (platform crypto) and
+    // registers the device with the relay; the core does the Mastodon
+    // /api/v1/push/subscription call with the account's credentials.
+    func pushSubscribe(endpoint: String, p256dh: String, auth: String) {
+        client.send("push_subscribe", ["endpoint": endpoint, "p256dh": p256dh, "auth": auth])
+    }
+    func pushUnsubscribe() { client.send("push_unsubscribe") }
 
     // Followed hashtags (Mastodon)
     func followHashtagPrompt(id: String) { client.send("follow_hashtag_prompt", ["id": id]) }

@@ -24,6 +24,8 @@ enum SettingRow {
     case movement(String)
     case postActions(String)
     case toggle(String, key: String, def: Bool)
+    // A device-side on/off backed by PushManager (not a core setting).
+    case pushToggle(String)
     case picker(String, key: String, options: [(String, Any)], def: Any)
     case stepper(String, key: String, def: Int, min: Int, max: Int, step: Int)
     case slider(String, key: String, def: Int, min: Int, max: Int)
@@ -77,6 +79,12 @@ final class SettingsViewController: UITableViewController {
         return [
             SettingPanel(title: "General", rows: [
                 .toggle("Return key sends the post", key: "enter_to_send", def: false),
+            ]),
+            SettingPanel(title: "Notifications",
+                    footer: "Get notified of mentions, boosts, favorites and more while the app "
+                          + "is closed. Mastodon accounts only.",
+                    rows: [
+                .pushToggle("Push notifications"),
             ]),
             SettingPanel(title: "Timelines",
                     footer: "Check timelines for new posts on this interval; new posts play "
@@ -227,6 +235,12 @@ final class SettingsPanelViewController: UITableViewController {
             return ToggleCell(title: title, on: boolVal(key, def)) { [weak self] on in
                 self?.state.updateSettings { $0[key] = on }
             }
+        case let .pushToggle(title):
+            return ToggleCell(title: title, on: PushManager.shared.isEnabled) { [weak self] on in
+                guard let self else { return }
+                if on { PushManager.shared.enable(state: self.state) }
+                else { PushManager.shared.disable(state: self.state) }
+            }
         case let .picker(title, key, options, def):
             let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
             var content = cell.defaultContentConfiguration()
@@ -287,6 +301,11 @@ final class SettingsPanelViewController: UITableViewController {
             guard !state.postActionCatalog.isEmpty else { return }
             navigationController?.pushViewController(
                 PostActionsViewController(state: state), animated: true)
+        case .pushToggle:
+            let on = !PushManager.shared.isEnabled
+            if on { PushManager.shared.enable(state: state) }
+            else { PushManager.shared.disable(state: state) }
+            (tableView.cellForRow(at: indexPath) as? ToggleCell)?.set(on: on)
         default:
             break
         }

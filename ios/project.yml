@@ -71,6 +71,12 @@ targets:
       - sdk: AVKit.framework
       # In-app browser session for the Mastodon OAuth login.
       - sdk: AuthenticationServices.framework
+      # Push notifications (remote-notification registration + local display).
+      - sdk: UserNotifications.framework
+      # The Notification Service Extension (decrypts pushes on-device); embedded
+      # into the app bundle.
+      - target: NotificationService
+        embed: true
     settings:
       base:
         SWIFT_VERSION: "5.0"
@@ -82,6 +88,7 @@ targets:
           - ../core/include
         DEVELOPMENT_TEAM: 9QBYDAX396
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: FastSMRW.entitlements
         PRODUCT_NAME: FastSMRW
         # testflight.sh overrides both at archive time (marketing version from
         # core/src/version.cpp, build number from the git commit count).
@@ -114,7 +121,45 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # Wake the app in the background to decrypt an incoming push (the
+        # Notification Service Extension does the decrypt; added at P4).
+        UIBackgroundModes:
+          - remote-notification
         CFBundleURLTypes:
           - CFBundleURLName: me.masonasons.FastSMRW.oauth
             CFBundleURLSchemes:
               - fastsm
+
+  # Decrypts incoming Web Push notifications on-device (CryptoKit). Shares the
+  # Web Push keypair with the app via a keychain access group.
+  NotificationService:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: notification-service
+      # Reuse the app's key store + decryption code (compiled into the extension).
+      - path: src/WebPushKeys.swift
+      - path: src/WebPushDecrypt.swift
+    dependencies:
+      - sdk: UserNotifications.framework
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        DEVELOPMENT_TEAM: 9QBYDAX396
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: NotificationService.entitlements
+        PRODUCT_NAME: NotificationService
+        PRODUCT_BUNDLE_IDENTIFIER: me.masonasons.FastSMRW.NotificationService
+        MARKETING_VERSION: "0.5.6"
+        CURRENT_PROJECT_VERSION: 1
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: notification-service/Info.plist
+      properties:
+        CFBundleName: NotificationService
+        CFBundleDisplayName: FastSM Notifications
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService

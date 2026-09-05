@@ -1319,6 +1319,8 @@ void MainWindow::on_event(const std::string& js) {
         ev_follow_request_prompt(e);
     else if (ev == "hashtag_prompt")
         ev_hashtag_prompt(e);
+    else if (ev == "hashtag_timeline_picker")
+        ev_hashtag_timeline_picker(e);
     else if (ev == "lists")
         ev_lists(e);
     else if (ev == "user_lists")
@@ -2748,6 +2750,45 @@ void MainWindow::ev_url_picker(const json& e) {
     gtk_widget_show_all(menu);
     // Destroy after the click lands: the item's activate fires after popdown,
     // so defer destruction to an idle instead of destroying on deactivate.
+    g_signal_connect(menu, "deactivate", G_CALLBACK(+[](GtkMenuShell* m, gpointer) {
+                         g_idle_add(
+                             +[](gpointer w) -> gboolean {
+                                 gtk_widget_destroy(GTK_WIDGET(w));
+                                 return G_SOURCE_REMOVE;
+                             },
+                             m);
+                     }),
+                     nullptr);
+    gtk_menu_popup_at_widget(GTK_MENU(menu), posts_view_, GDK_GRAVITY_CENTER, GDK_GRAVITY_CENTER,
+                             nullptr);
+}
+
+void MainWindow::ev_hashtag_timeline_picker(const json& e) {
+    const json tags = e.value("tags", json::array());
+    if (tags.empty())
+        return;
+    GtkWidget* menu = gtk_menu_new();
+    for (const auto& t : tags) {
+        if (!t.is_string())
+            continue;
+        const std::string tag = t.get<std::string>();
+        GtkWidget* item = gtk_menu_item_new_with_label(("#" + tag).c_str());
+        g_object_set_data_full(G_OBJECT(item), "fastsm-tag", g_strdup(tag.c_str()), g_free);
+        g_signal_connect(item, "activate",
+                         G_CALLBACK(+[](GtkMenuItem* mi, gpointer u) {
+                             auto* self = static_cast<MainWindow*>(u);
+                             const auto* tag = static_cast<const char*>(
+                                 g_object_get_data(G_OBJECT(mi), "fastsm-tag"));
+                             if (tag)
+                                 self->dispatch_cmd({{"cmd", "spawn_timeline"},
+                                                     {"kind", "hashtag"},
+                                                     {"value", tag}});
+                         }),
+                         this);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+    }
+    gtk_widget_show_all(menu);
+    // Destroy after the click lands (activate fires after popdown) — defer to idle.
     g_signal_connect(menu, "deactivate", G_CALLBACK(+[](GtkMenuShell* m, gpointer) {
                          g_idle_add(
                              +[](gpointer w) -> gboolean {

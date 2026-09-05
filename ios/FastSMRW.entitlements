@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Remote (push) notifications. This dev-device entitlement uses the
+	     "development" (sandbox) APNs environment. For TestFlight / App Store,
+	     testflight.sh swaps in FastSMRW-production.entitlements (production). -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!-- Shared keychain group so the Notification Service Extension can read the
+	     Web Push keypair (WebPushKeys) to decrypt incoming pushes. As the only
+	     entry it also becomes the app's default keychain group. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)me.masonasons.FastSMRW.push</string>
+	</array>
+</dict>
+</plist>

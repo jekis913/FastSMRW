@@ -29,6 +29,7 @@ const std::vector<PostActionDef>& post_action_catalog() {
         {"mute_conversation", "Mute Conversation"},
         {"favorited_by", "See Who Favorited"}, {"reblogged_by", "See Who Boosted"},
         {"alias", "Add or Edit Alias"},      {"follow_hashtag", "Follow Hashtag"},
+        {"open_hashtag_timeline", "Open Hashtag Timeline"},
         {"speak_user", "Speak User"},        {"speak_reply", "Speak Referenced Reply"},
         {"jump_reply", "Jump to Referenced Reply"},
         {"edit", "Edit Post"},               {"pin_post", "Pin to Profile"},

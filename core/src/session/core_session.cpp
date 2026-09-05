@@ -568,10 +568,16 @@ void CoreSession::handle(const json& cmd) {
         cmd_delete_list(cmd);
     else if (c == "follow_hashtag_prompt")
         cmd_follow_hashtag_prompt(cmd);
+    else if (c == "open_hashtag_timeline_prompt")
+        cmd_open_hashtag_timeline_prompt(cmd);
     else if (c == "follow_hashtag")
         cmd_follow_hashtag(cmd);
     else if (c == "unfollow_hashtag")
         cmd_unfollow_hashtag(cmd);
+    else if (c == "push_subscribe")
+        cmd_push_subscribe(cmd);
+    else if (c == "push_unsubscribe")
+        cmd_push_unsubscribe(cmd);
     else if (c == "list_followed_hashtags")
         cmd_list_followed_hashtags();
     else if (c == "list_trending_hashtags")
@@ -1513,6 +1519,33 @@ void CoreSession::cmd_follow_hashtag_prompt(const json& cmd) {
     emit({{"event", "hashtag_prompt"}, {"tags", std::move(tags)}});
 }
 
+void CoreSession::cmd_open_hashtag_timeline_prompt(const json& cmd) {
+    // The hashtags in the focused post (deduped, order preserved).
+    std::vector<std::string> tags;
+    TimelineController* tc = current();
+    const std::string row_id = cmd.value("id", std::string{});
+    if (tc && !row_id.empty())
+        if (const TimelineItem* item = find_item(tc, row_id))
+            if (const Status* s = item->actionable_status()) {
+                std::set<std::string> seen;
+                for (const auto& t : s->tags)
+                    if (!t.empty() && seen.insert(t).second)
+                        tags.push_back(t);
+            }
+    if (tags.empty()) {
+        sound_.play(sound::Earcon::Error);
+        emit_announce("This post has no hashtags.");
+        return;
+    }
+    // One hashtag: open it straight away. Several: let the UI pick which; the
+    // chosen tag comes back as the existing spawn_timeline command.
+    if (tags.size() == 1) {
+        cmd_spawn_timeline({{"kind", "hashtag"}, {"value", tags.front()}});
+        return;
+    }
+    emit({{"event", "hashtag_timeline_picker"}, {"tags", tags}});
+}
+
 void CoreSession::cmd_follow_hashtag(const json& cmd) {
     SocialAccount* acct = accounts_.selected();
     const std::string name = without_hash(cmd.value("name", std::string{}));
@@ -1541,6 +1574,49 @@ void CoreSession::cmd_unfollow_hashtag(const json& cmd) {
             if (ok) // refresh an open manager dialog
                 emit({{"event", "followed_hashtags"}, {"tags", followed_tags_to_json(tags)}});
         });
+    });
+}
+
+void CoreSession::cmd_push_subscribe(const json& cmd) {
+    const std::string endpoint = cmd.value("endpoint", std::string{});
+    const std::string p256dh = cmd.value("p256dh", std::string{});
+    const std::string auth = cmd.value("auth", std::string{});
+    if (endpoint.empty() || p256dh.empty() || auth.empty()) {
+        emit({{"event", "push_subscribe_result"}, {"ok", false}, {"reason", "missing"}});
+        return;
+    }
+    // Subscribe EVERY push-capable (Mastodon) account to the same device endpoint
+    // and keys, so one device receives notifications for all of them.
+    std::vector<SocialAccount*> targets;
+    for (SocialAccount* a : accounts_.accounts())
+        if (a && a->features().web_push)
+            targets.push_back(a);
+    if (targets.empty()) {
+        emit({{"event", "push_subscribe_result"}, {"ok", false}, {"reason", "unsupported"}});
+        return;
+    }
+    worker_.post([this, targets, endpoint, p256dh, auth] {
+        bool any = false;
+        for (SocialAccount* a : targets)
+            any = a->subscribe_push(endpoint, p256dh, auth) || any;
+        loop_.post([this, any] { emit({{"event", "push_subscribe_result"}, {"ok", any}}); });
+    });
+}
+
+void CoreSession::cmd_push_unsubscribe(const json&) {
+    std::vector<SocialAccount*> targets;
+    for (SocialAccount* a : accounts_.accounts())
+        if (a && a->features().web_push)
+            targets.push_back(a);
+    if (targets.empty()) {
+        emit({{"event", "push_unsubscribe_result"}, {"ok", false}, {"reason", "unsupported"}});
+        return;
+    }
+    worker_.post([this, targets] {
+        bool any = false;
+        for (SocialAccount* a : targets)
+            any = a->unsubscribe_push() || any;
+        loop_.post([this, any] { emit({{"event", "push_unsubscribe_result"}, {"ok", any}}); });
     });
 }
 
@@ -3575,6 +3651,8 @@ bool CoreSession::run_post_action(const std::string& key, const std::string& row
         return cmd_begin_alias({{"id", row}}), true;
     if (key == "follow_hashtag")
         return cmd_follow_hashtag_prompt({{"id", row}}), true;
+    if (key == "open_hashtag_timeline")
+        return cmd_open_hashtag_timeline_prompt({{"id", row}}), true;
     if (key == "edit")
         return cmd_compose_context({{"mode", "edit"}, {"id", row}}), true;
     if (key == "pin_post")
@@ -3684,6 +3762,8 @@ void CoreSession::cmd_perform_action(const json& cmd) {
         return cmd_delete_post({{"id", row}});
     if (a == "FollowHashtag")
         return cmd_follow_hashtag_prompt({{"id", row}});
+    if (a == "OpenHashtagTimeline")
+        return cmd_open_hashtag_timeline_prompt({{"id", row}});
     if (a == "ManageHashtags")
         return cmd_list_followed_hashtags();
     if (a == "UpdateProfile")
@@ -4918,6 +4998,8 @@ json CoreSession::row_json(const TimelineItem& item, std::int64_t now) const {
             r["muted"] = true; // conversation muted -> Status menu shows a check
         if (!s->media_attachments.empty())
             r["has_media"] = true; // gates the "View media" action
+        if (!s->tags.empty())
+            r["has_hashtags"] = true; // gates the "Open hashtag timeline" action
         if (s->in_reply_to_id && !s->in_reply_to_id->empty())
             r["is_reply"] = true; // gates the "Speak referenced reply" actions
         if (SocialAccount* me = accounts_.selected())

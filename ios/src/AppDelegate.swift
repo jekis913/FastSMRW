@@ -8,6 +8,7 @@
 
 import AVFAudio
 import UIKit
+import UserNotifications
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -20,7 +21,23 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, options: [.mixWithOthers])
         try? session.setActive(true)
+        // Route notification presentation through PushManager. Registration
+        // itself is not triggered here — a Notifications setting drives it once
+        // the push backend is live (see PushManager).
+        UNUserNotificationCenter.current().delegate = PushManager.shared
         return true
+    }
+
+    // MARK: Remote (push) notification registration — forwarded to PushManager.
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushManager.shared.didRegister(deviceToken: deviceToken)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        PushManager.shared.didFailToRegister(error: error)
     }
 
     func application(_ application: UIApplication,

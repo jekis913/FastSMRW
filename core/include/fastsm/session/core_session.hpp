@@ -121,6 +121,11 @@ private:
     // --- Followed hashtags (Mastodon) ---
     void cmd_follow_hashtag_prompt(const nlohmann::json& cmd); // {id} -> hashtag_prompt event
     void cmd_follow_hashtag(const nlohmann::json& cmd);        // {name}
+    void cmd_push_subscribe(const nlohmann::json& cmd);   // {endpoint,p256dh,auth}
+    void cmd_push_unsubscribe(const nlohmann::json& cmd); // {}
+    // {id} -> spawns the post's only hashtag timeline, or emits a
+    // hashtag_timeline_picker event when the post has several.
+    void cmd_open_hashtag_timeline_prompt(const nlohmann::json& cmd);
     void cmd_unfollow_hashtag(const nlohmann::json& cmd);      // {name}
     void cmd_list_followed_hashtags();                         // -> followed_hashtags event
     void emit_followed_hashtags();

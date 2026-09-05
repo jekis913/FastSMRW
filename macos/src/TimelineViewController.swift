@@ -437,6 +437,10 @@ final class TimelineViewController: NSViewController, NSTableViewDataSource, NST
         guard let id = selectedRowId else { return }
         state.followHashtagPrompt(id: id)
     }
+    @objc func openHashtagTimelineForSelection(_ sender: Any?) {
+        guard let id = selectedRowId else { return }
+        state.openHashtagTimelinePrompt(id: id)
+    }
     @objc func showPostInfo(_ sender: Any?) {
         guard let id = selectedRowId else { return }
         state.postInfo(id: id)

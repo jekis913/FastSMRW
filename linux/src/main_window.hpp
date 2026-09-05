@@ -155,6 +155,7 @@ private:
     void ev_follow_request_prompt(const nlohmann::json& e); // core-driven accept/reject choice
     void do_settings();
     void ev_hashtag_prompt(const nlohmann::json& e);
+    void ev_hashtag_timeline_picker(const nlohmann::json& e); // pick a post's hashtag to open
 
     // --- signal handlers
     static gboolean on_posts_key(GtkWidget* widget, GdkEventKey* event, gpointer user);

@@ -286,6 +286,7 @@ fun HomeScreen(
                 onSpeakReply = viewModel::speakReply,
                 onJumpToReply = viewModel::jumpToReply,
                 onAddAlias = viewModel::beginAlias,
+                onOpenHashtagTimeline = viewModel::openHashtagTimelinePrompt,
                 onReport = viewModel::reportPost,
                 onCopy = viewModel::copyRow,
                 onSetRelationship = viewModel::setRelationship,
@@ -454,6 +455,27 @@ fun HomeScreen(
             },
         )
     }
+
+    val hashtagPicker by viewModel.hashtagTimelinePicker.collectAsStateWithLifecycle()
+    hashtagPicker?.let { tags ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissHashtagTimelinePicker,
+            title = { Text("Open hashtag timeline") },
+            text = {
+                Column {
+                    tags.forEach { tag ->
+                        TextButton(onClick = { viewModel.chooseHashtagTimeline(tag) }) {
+                            Text("#$tag")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissHashtagTimelinePicker) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 /**
@@ -615,6 +637,7 @@ private fun StatusList(
     onSpeakReply: (String) -> Unit,
     onJumpToReply: (String) -> Unit,
     onAddAlias: (String) -> Unit,
+    onOpenHashtagTimeline: (String) -> Unit,
     onReport: (id: String, category: String, comment: String, forward: Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onSetRelationship: (accountId: String, action: String, acct: String) -> Unit,
@@ -721,6 +744,7 @@ private fun StatusList(
                 onSpeakReply = onSpeakReply,
                 onJumpToReply = onJumpToReply,
                 onAddAlias = onAddAlias,
+                onOpenHashtagTimeline = onOpenHashtagTimeline,
                 onReport = onReport,
                 onCopy = onCopy,
                 onSetRelationship = onSetRelationship,

@@ -104,6 +104,8 @@ enum MainMenu {
         add("Followers", #selector(MainWindowController.openFollowers(_:)), "")
         add("Following", #selector(MainWindowController.openFollowing(_:)), "")
         add("Follow Hashtag…", #selector(MainWindowController.followHashtag(_:)), "h")
+        add("Open Hashtag Timeline…",
+            #selector(MainWindowController.openHashtagTimeline(_:)), "h", [.command, .shift])
         statusMenu.addItem(.separator())
         add("Open in Browser", #selector(MainWindowController.openSelectionInBrowser(_:)), "")
 

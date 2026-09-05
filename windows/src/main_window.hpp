@@ -185,6 +185,7 @@ private:
     void ev_user_lists(const nlohmann::json& e);     // open the add/remove-from-lists checklist
     void ev_lists(const nlohmann::json& e);          // forward into the open Lists manager
     void ev_hashtag_prompt(const nlohmann::json& e);    // prompt to follow a hashtag
+    void ev_hashtag_timeline_picker(const nlohmann::json& e); // pick a post's hashtag to open
     void ev_followed_hashtags(const nlohmann::json& e); // open / refresh Followed Hashtags manager
     void ev_trending_hashtags(const nlohmann::json& e); // open the Trending Hashtags manager
     void ev_alias_prompt(const nlohmann::json& e);      // prompt to add/edit a user alias

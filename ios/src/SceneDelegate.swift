@@ -46,6 +46,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         self.window = window
 
         state.start()
+        // If push was left on, re-register + re-subscribe (subscriptions lapse).
+        PushManager.shared.refreshIfEnabled(state: state)
         for context in connectionOptions.urlContexts { handle(context.url) }
     }
 

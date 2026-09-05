@@ -19,7 +19,7 @@ final class MainViewController: UIViewController {
 
     private let tabScroll = UIScrollView()
     private let tabStack = UIStackView()
-    private let tableView = UITableView(frame: .zero, style: .plain)
+    private let tableView = TimelineTableView(frame: .zero, style: .plain)
     private let refreshControl = UIRefreshControl()
     private var tabTopConstraints: [NSLayoutConstraint] = []
     private var tabBottomConstraints: [NSLayoutConstraint] = []
@@ -104,13 +104,20 @@ final class MainViewController: UIViewController {
         tableView.refreshControl = refreshControl
 
         // Horizontal swipes on the posts area switch timelines (matching the
-        // left/right arrows on desktop). VoiceOver users use the tab strip.
+        // left/right arrows on desktop). One-finger swipes are for sighted use;
+        // VoiceOver eats those, so the three-finger page-scroll gesture is wired
+        // to the same actions below via accessibilityScroll.
         let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(swipedLeft))
         swipeLeft.direction = .left
         let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(swipedRight))
         swipeRight.direction = .right
         tableView.addGestureRecognizer(swipeLeft)
         tableView.addGestureRecognizer(swipeRight)
+        // VoiceOver three-finger swipe left/right (the "scroll page" gesture)
+        // moves to the next/previous timeline — the accessible equivalent of the
+        // one-finger swipes above, which VoiceOver intercepts.
+        tableView.onPageLeft = { [weak self] in self?.state.selectTimeline(dir: "next") }
+        tableView.onPageRight = { [weak self] in self?.state.selectTimeline(dir: "prev") }
 
         view.addSubview(tabScroll)
         view.addSubview(tableView)
@@ -263,6 +270,9 @@ final class MainViewController: UIViewController {
             self.push(ProfileEditorViewController(state: self.state, editor: editor))
         }
         state.onHashtagPrompt = { [weak self] tags in self?.showHashtagPrompt(tags) }
+        state.onHashtagTimelinePicker = { [weak self] tags in
+            self?.showHashtagTimelinePicker(tags)
+        }
         state.onMediaOpen = { [weak self] media in
             guard let self else { return }
             Media.present(media, from: self.topPresenter)
@@ -1094,6 +1104,11 @@ final class MainViewController: UIViewController {
             return ("Add or Edit Alias", { [weak self] in self?.state.beginAlias(id: id) })
         case "follow_hashtag":
             return ("Follow Hashtag", { [weak self] in self?.state.followHashtagPrompt(id: id) })
+        case "open_hashtag_timeline":
+            return row.hasHashtags
+                ? ("Open Hashtag Timeline",
+                   { [weak self] in self?.state.openHashtagTimelinePrompt(id: id) })
+                : nil
         case "speak_user":
             return ("Speak User", { [weak self] in self?.state.speakUser(id: id) })
         case "speak_reply":
@@ -1267,6 +1282,23 @@ final class MainViewController: UIViewController {
         present(sheet, animated: true)
     }
 
+    /// Pick which of a post's hashtags to open a timeline for (the core only
+    /// sends this when a post has several; one tag opens straight away).
+    private func showHashtagTimelinePicker(_ tags: [String]) {
+        guard !tags.isEmpty else { return }
+        let sheet = UIAlertController(title: "Open Hashtag Timeline", message: nil,
+                                      preferredStyle: .actionSheet)
+        for tag in tags {
+            sheet.addAction(UIAlertAction(title: "#" + tag, style: .default) { [weak self] _ in
+                self?.state.spawnTimeline(kind: "hashtag", value: tag)
+            })
+        }
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.popoverPresentationController?.sourceView = view
+        sheet.popoverPresentationController?.sourceRect = view.bounds
+        present(sheet, animated: true)
+    }
+
     // MARK: VoiceOver app-level gestures
 
     // Magic tap (two-finger double-tap) performs the post's secondary action;
@@ -1382,5 +1414,22 @@ final class PostCell: UITableViewCell {
     override func accessibilityElementDidLoseFocus() {
         super.accessibilityElementDidLoseFocus()
         onUnfocused?()
+    }
+}
+
+/// The posts table. Overrides the VoiceOver page-scroll gesture (a three-finger
+/// horizontal swipe) so it moves between timelines instead of doing nothing —
+/// the one-finger `UISwipeGestureRecognizer`s on the table never fire under
+/// VoiceOver, which claims one-finger swipes for its own navigation.
+final class TimelineTableView: UITableView {
+    var onPageLeft: (() -> Void)?
+    var onPageRight: (() -> Void)?
+
+    override func accessibilityScroll(_ direction: UIAccessibilityScrollDirection) -> Bool {
+        switch direction {
+        case .left:  onPageLeft?();  return true
+        case .right: onPageRight?(); return true
+        default:     return super.accessibilityScroll(direction)
+        }
     }
 }

@@ -72,6 +72,10 @@ public:
     std::vector<FollowedTag> followed_hashtags() override;
     std::vector<FollowedTag> trending_hashtags() override;
 
+    bool subscribe_push(const std::string& endpoint, const std::string& p256dh,
+                        const std::string& auth) override;
+    bool unsubscribe_push() override;
+
     std::vector<TimelineList> lists() override;
     std::vector<TimelineList> account_lists(const std::string& account_id) override;
     bool set_list_membership(const std::string& list_id, const std::string& account_id,

@@ -52,6 +52,9 @@ struct Row: Decodable, Equatable {
     /// "See who favorited / boosted" post actions.
     var favoritesCount = 0
     var boostsCount = 0
+    /// The post carries at least one hashtag — gates the "Open hashtag timeline"
+    /// action (omitted by the core when the post has none).
+    var hasHashtags = false
     /// The post's links (title + url), present only when the "expand_links"
     /// action is enabled — one per-link action is built from these.
     var links: [PostLink] = []
@@ -59,6 +62,7 @@ struct Row: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, text, favorited, boosted, acct, time, thread, links
         case hasMedia = "has_media"
+        case hasHashtags = "has_hashtags"
         case isReply = "is_reply"
         case isMine = "is_mine"
         case gapAfter = "gap_after"
@@ -78,6 +82,7 @@ struct Row: Decodable, Equatable {
         favorited = try c.decodeIfPresent(Bool.self, forKey: .favorited) ?? false
         boosted = try c.decodeIfPresent(Bool.self, forKey: .boosted) ?? false
         hasMedia = try c.decodeIfPresent(Bool.self, forKey: .hasMedia) ?? false
+        hasHashtags = try c.decodeIfPresent(Bool.self, forKey: .hasHashtags) ?? false
         isReply = try c.decodeIfPresent(Bool.self, forKey: .isReply) ?? false
         isMine = try c.decodeIfPresent(Bool.self, forKey: .isMine) ?? false
         gapAfter = try c.decodeIfPresent(Bool.self, forKey: .gapAfter) ?? false
@@ -399,6 +404,13 @@ struct SpeechCatalog: Decodable {
 /// after an unfollow, so tolerate its absence.
 struct HashtagPrompt: Decodable { let tags: [String] }
 
+/// The hashtags in a post, for the "Open hashtag timeline" action to pick among.
+/// Emitted only when a post has more than one tag (a single tag opens directly).
+struct HashtagTimelinePicker: Decodable { let tags: [String] }
+
+/// Result of a push_subscribe / push_unsubscribe command.
+struct PushResult: Decodable { let ok: Bool }
+
 /// Prompt to add/edit a user alias (a global, cross-account custom display name).
 struct AliasPrompt: Decodable { let key: String; let handle: String; let current: String }
 struct AliasItem: Decodable, Equatable { let key: String; let handle: String; let alias: String }
@@ -579,6 +591,9 @@ enum CoreEvent {
     case movementCatalog(MovementCatalog)
     case postActionCatalog(PostActionCatalog)
     case hashtagPrompt(HashtagPrompt)
+    case hashtagTimelinePicker(HashtagTimelinePicker)
+    case pushSubscribeResult(PushResult)
+    case pushUnsubscribeResult(PushResult)
     case followedHashtags(FollowedHashtags)
     case trendingHashtags(FollowedHashtags)
     case aliasPrompt(AliasPrompt)
@@ -625,6 +640,12 @@ enum CoreEvent {
         case "post_action_catalog":
             return decode(PostActionCatalog.self).map(CoreEvent.postActionCatalog)
         case "hashtag_prompt": return decode(HashtagPrompt.self).map(CoreEvent.hashtagPrompt)
+        case "hashtag_timeline_picker":
+            return decode(HashtagTimelinePicker.self).map(CoreEvent.hashtagTimelinePicker)
+        case "push_subscribe_result":
+            return decode(PushResult.self).map(CoreEvent.pushSubscribeResult)
+        case "push_unsubscribe_result":
+            return decode(PushResult.self).map(CoreEvent.pushUnsubscribeResult)
         case "followed_hashtags": return decode(FollowedHashtags.self).map(CoreEvent.followedHashtags)
         case "trending_hashtags": return decode(FollowedHashtags.self).map(CoreEvent.trendingHashtags)
         case "alias_prompt": return decode(AliasPrompt.self).map(CoreEvent.aliasPrompt)

@@ -145,6 +145,19 @@ final class URLPickerWindowController: ListPickerWindowController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
+/// Choose which of a post's hashtags to open a timeline for. The core only
+/// sends the picker for posts with several tags; a single tag opens directly.
+final class HashtagTimelinePickerWindowController: ListPickerWindowController {
+    init(state: AppState, tags: [String]) {
+        super.init(title: "Open Hashtag Timeline", rows: tags.map { "#" + $0 }) { index in
+            state.spawnTimeline(kind: "hashtag", value: tags[index])
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
 /// A reusable single-column list sheet: choose one row, invoke a callback.
 @MainActor
 class ListPickerWindowController: NSWindowController, NSTableViewDataSource, NSTableViewDelegate {
